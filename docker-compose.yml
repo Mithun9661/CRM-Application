@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  crm-app:
+    build: .
+    container_name: crm-app
+    ports:
+      - "7777:7777"
+    env_file:
+      - .env
+
+  crm-consumer:
+    build: .
+    container_name: crm-consumer
+    command: node consumer.js
+    env_file:
+      - .env
+    depends_on:
+      - redis
+      - mongo
+    restart: always
+
+  redis:
+    image: redis:7
+    container_name: crm-redis
+    ports:
+      - "6379:6379"
+
+  mongo:
+    image: mongo:7
+    container_name: crm-mongo
+    ports:
+      - "27017:27017"
