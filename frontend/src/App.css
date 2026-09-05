@@ -1,0 +1,712 @@
+/* ===============================
+   GLOBAL
+================================= */
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: #f4f6f8;
+  color: #1f2937;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  transition: 0.2s ease;
+}
+
+/* ===============================
+   LOGIN PAGE
+================================= */
+
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  background: linear-gradient(135deg, #1e3a8a, #2563eb);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  background: white;
+  padding: 35px;
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.login-card h1 {
+  margin: 0 0 10px;
+  text-align: center;
+  color: #1e3a8a;
+}
+
+.login-card > p {
+  text-align: center;
+  color: #6b7280;
+  margin-bottom: 25px;
+}
+
+.login-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 13px;
+  border: 1px solid #d1d5db;
+  border-radius: 7px;
+  outline: none;
+}
+
+.login-card input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.login-card button {
+  padding: 13px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.login-card button:hover {
+  background: #1d4ed8;
+}
+
+.demo-box {
+  margin-top: 25px;
+  padding: 15px;
+  background: #eff6ff;
+  border-radius: 8px;
+  border: 1px solid #bfdbfe;
+}
+
+.demo-box h3 {
+  margin-top: 0;
+  color: #1e3a8a;
+}
+
+.demo-box p {
+  margin: 8px 0;
+}
+
+/* ===============================
+   NAVBAR
+================================= */
+
+.navbar {
+  min-height: 70px;
+  background: #1e3a8a;
+  color: white;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 30px;
+}
+
+.navbar h2 {
+  margin: 0;
+}
+
+.navbar div {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.navbar button {
+  padding: 10px 18px;
+  background: #dc2626;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.navbar button:hover {
+  background: #b91c1c;
+}
+
+/* ===============================
+   DASHBOARD LAYOUT
+================================= */
+
+.dashboard {
+  display: flex;
+  min-height: calc(100vh - 70px);
+}
+
+.sidebar {
+  width: 230px;
+  background: #111827;
+  padding: 20px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar button {
+  width: 100%;
+  text-align: left;
+  padding: 13px 15px;
+  background: transparent;
+  color: white;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.sidebar button:hover {
+  background: #374151;
+}
+
+.sidebar button.active {
+  background: #2563eb;
+}
+
+.main-content {
+  flex: 1;
+  padding: 35px;
+  background: #f4f6f8;
+  overflow-x: auto;
+}
+
+.main-content h1 {
+  margin-top: 0;
+  color: #1f2937;
+}
+
+/* ===============================
+   DASHBOARD STATS
+================================= */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-top: 25px;
+}
+
+.stat-card {
+  background: white;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.stat-card h3 {
+  margin: 0;
+  color: #6b7280;
+  font-size: 16px;
+}
+
+.stat-card p {
+  font-size: 32px;
+  font-weight: bold;
+  margin: 15px 0 0;
+  color: #2563eb;
+}
+
+/* ===============================
+   COMMON BUTTONS
+================================= */
+
+.refresh-btn {
+  margin-top: 20px;
+  padding: 12px 20px;
+  background: #2563eb;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.refresh-btn:hover {
+  background: #1d4ed8;
+}
+
+.create-btn {
+  margin-top: 15px;
+  padding: 13px;
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.create-btn:hover {
+  background: #15803d;
+}
+
+/* ===============================
+   PAGE HEADER
+================================= */
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+}
+
+.page-header .refresh-btn {
+  margin-top: 0;
+}
+
+/* ===============================
+   MESSAGE
+================================= */
+
+.message {
+  margin-top: 18px;
+  padding: 12px 15px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border-radius: 7px;
+  border: 1px solid #bfdbfe;
+}
+
+.ticket-update-message {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.ticket-update-success {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.ticket-update-error {
+  background: #fee2e2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+}
+
+/* ===============================
+   TICKETS
+================================= */
+
+.tickets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  margin-top: 25px;
+}
+
+.ticket-card {
+  background: white;
+  padding: 22px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+  border-left: 4px solid #2563eb;
+}
+
+.ticket-card h3 {
+  margin: 0 0 15px;
+  color: #1e3a8a;
+}
+
+.ticket-card p {
+  margin: 10px 0;
+  color: #374151;
+  word-break: break-word;
+}
+
+.status {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 5px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+/* OPEN STATUS */
+
+.status.open {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+/* IN PROGRESS STATUS */
+
+.status.in_progress {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+/* CLOSED STATUS */
+
+.status.closed {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+/* ===============================
+   UPDATE TICKET STATUS
+================================= */
+
+.ticket-update-section {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.ticket-update-section label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: #374151;
+  font-size: 14px;
+}
+
+.ticket-status-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ticket-status-select {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+}
+
+.ticket-status-select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.update-ticket-btn {
+  padding: 10px 16px;
+  background: #f59e0b;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.update-ticket-btn:hover {
+  background: #d97706;
+}
+
+.update-ticket-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* ===============================
+   EMPTY STATE
+================================= */
+
+.empty-state {
+  margin-top: 30px;
+  padding: 35px;
+  background: white;
+  border-radius: 10px;
+  text-align: center;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+}
+
+.empty-state h3 {
+  margin-top: 0;
+}
+
+/* ===============================
+   CREATE TICKET FORM
+================================= */
+
+.ticket-form-container {
+  max-width: 650px;
+  margin-top: 25px;
+}
+
+.ticket-form {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.ticket-form label {
+  font-weight: bold;
+  color: #374151;
+  margin-top: 8px;
+}
+
+.ticket-form input,
+.ticket-form textarea,
+.ticket-form select {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 15px;
+}
+
+.ticket-form textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.ticket-form input:focus,
+.ticket-form textarea:focus,
+.ticket-form select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ===============================
+   USERS MANAGEMENT
+================================= */
+
+.users-table-container {
+  margin-top: 25px;
+  background: white;
+  border-radius: 10px;
+  overflow-x: auto;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.users-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 800px;
+}
+
+.users-table th,
+.users-table td {
+  padding: 15px;
+  text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.users-table th {
+  background: #f3f4f6;
+  font-weight: 600;
+  color: #374151;
+}
+
+.users-table tr:hover {
+  background: #f9fafb;
+}
+
+.user-status {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.user-status.approved {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.user-status.pending {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.user-status.rejected {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+/* ===============================
+   USER ACTION BUTTONS
+================================= */
+
+.user-action-btn {
+  padding: 8px 12px;
+  margin-right: 6px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  color: white;
+  font-weight: bold;
+}
+
+.edit-user-btn {
+  background: #2563eb;
+}
+
+.edit-user-btn:hover {
+  background: #1d4ed8;
+}
+
+.update-user-btn {
+  background: #16a34a;
+}
+
+.update-user-btn:hover {
+  background: #15803d;
+}
+
+/* ===============================
+   USER EDIT FORM
+================================= */
+
+.user-edit-container {
+  max-width: 650px;
+  margin-top: 25px;
+}
+
+.user-edit-form {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.user-edit-form label {
+  font-weight: bold;
+  color: #374151;
+}
+
+.user-edit-form input,
+.user-edit-form select {
+  padding: 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+}
+
+.user-edit-form input:focus,
+.user-edit-form select:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+/* ===============================
+   RESPONSIVE DESIGN
+================================= */
+
+@media (max-width: 1000px) {
+  .stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .navbar {
+    padding: 15px 20px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .navbar div {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .dashboard {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    padding: 10px;
+  }
+
+  .sidebar button {
+    min-width: max-content;
+  }
+
+  .main-content {
+    padding: 25px 15px;
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .page-header .refresh-btn {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 500px) {
+  .stats {
+    grid-template-columns: 1fr;
+  }
+
+  .login-card {
+    padding: 25px 20px;
+  }
+
+  .navbar h2 {
+    font-size: 20px;
+  }
+
+  .main-content h1 {
+    font-size: 25px;
+  }
+
+  .ticket-form {
+    padding: 20px;
+  }
+
+  .ticket-status-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ticket-status-select {
+    width: 100%;
+  }
+
+  .update-ticket-btn {
+    width: 100%;
+  }
+
+  .ticket-card {
+    padding: 18px;
+  }
+}

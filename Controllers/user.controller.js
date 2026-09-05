@@ -6,7 +6,7 @@ const objectConverter = require("../utils/objectConverter")
 
 
 
-const User = require(("../Models/user.model"))
+const User =require("../Models/user.model")
 
 /**
  * Controller to fetch all the user details.
@@ -62,7 +62,7 @@ exports.updateUser = async(req, res)=>{
     const userIdReq = req.params.userId;
     try{
         const user = await User.findOneAndUpdate({userId : userIdReq},{
-            userName : req.body.name,
+           name : req.body.name,
             userStatus : req.body.userStatus,
             userType : req.body.userType
         }).exec();
