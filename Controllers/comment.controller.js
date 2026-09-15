@@ -1,18 +1,8 @@
 const Comment = require("../Models/comment.model");
 const User = require("../Models/user.model");
 const Ticket = require("../Models/ticket.model");
-const constants = require("../utils/constants");
 const { notifyUsers } = require("../utils/notificationService");
-
-const sameCompany = (a, b) => String(a || "") === String(b || "");
-
-const canAccessTicket = (user, ticket) => {
-  if (user.userType === constants.userType.superAdmin) return true;
-  if (!sameCompany(user.companyId, ticket.companyId)) return false;
-  if (user.userType === constants.userType.admin) return true;
-  if (user.userType === constants.userType.engineer) return ticket.assignee === user.userId;
-  return ticket.reporter === user.userId;
-};
+const { canAccessTicket } = require("../utils/ticketAccess");
 
 exports.createComment = async (req, res) => {
   try {
