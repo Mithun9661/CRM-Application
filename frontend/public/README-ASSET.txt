@@ -1,1 +1,0 @@
-CRM login hero asset managed by build assets.
