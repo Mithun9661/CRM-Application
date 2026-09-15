@@ -2,6 +2,7 @@ const Comment = require("../Models/comment.model");
 const User = require("../Models/user.model");
 const Ticket = require("../Models/ticket.model");
 const constants = require("../utils/constants");
+const { notifyUsers } = require("../utils/notificationService");
 
 const sameCompany = (a, b) => String(a || "") === String(b || "");
 
@@ -40,6 +41,20 @@ exports.createComment = async (req, res) => {
       newValue: { content }
     });
     await ticket.save();
+
+    const recipients = [ticket.reporter, ticket.assignee].filter(
+      (recipient) => recipient && recipient !== loggedInUser.userId
+    );
+
+    await notifyUsers({
+      recipients,
+      companyId: ticket.companyId,
+      ticketId: ticket._id,
+      type: "COMMENT_ADDED",
+      title: "New ticket comment",
+      message: `${loggedInUser.name || loggedInUser.userId} commented on ${ticket.title}.`,
+      createdBy: loggedInUser.userId
+    });
 
     const populated = await Comment.findById(createdComment._id).populate(
       "commenterId",
