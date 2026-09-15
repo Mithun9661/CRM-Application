@@ -1,12 +1,13 @@
 {
   "name": "crm",
   "version": "1.0.0",
-  "description": "this is a crm we are building together",
+  "description": "EnterpriseFlow multi-company CRM service desk",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "consumer": "node consumer.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --runInBand",
+    "smoke": "node scripts/smoke-test.js"
   },
   "author": "Mithun Kumar",
   "license": "ISC",
