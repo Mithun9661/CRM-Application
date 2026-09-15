@@ -15,7 +15,7 @@ const authMW = require("../middlewares/authjwt");
  * @swagger
  * /dashboard:
  *   get:
- *     summary: Get dashboard statistics
+ *     summary: Get tenant-aware CRM dashboard statistics
  *     tags: [Dashboard]
  *     security:
  *       - bearerAuth: []
@@ -25,7 +25,7 @@ const authMW = require("../middlewares/authjwt");
  */
 router.get(
   "/dashboard",
-  [authMW.verifyToken, authMW.isAdmin],
+  [authMW.verifyToken, authMW.isAdminOrSuperAdmin],
   dashboardController.getDashboardStats
 );
 
