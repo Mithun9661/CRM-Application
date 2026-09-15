@@ -4,13 +4,13 @@ const Ticket = require("../Models/ticket.model");
 const { randomUUID: uuidv4 } = require("crypto");
 const { createRedis } = require("../utils/redisClient");
 const { notifyUsers } = require("../utils/notificationService");
+const { sameCompany, canAccessTicket } = require("../utils/ticketAccess");
 const redisClient = createRedis();
 const dotenv = require("dotenv");
 dotenv.config();
 
 const QUEUE_KEY = process.env.QUEUE_KEY || "queue:notifications";
 
-const sameCompany = (a, b) => String(a || "") === String(b || "");
 const escapeRegex = (value = "") => String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 const enqueue = async (payload) => {
@@ -38,14 +38,6 @@ const sendMessageToRedis = async (req, engineer, ticket) => {
 };
 
 const getCurrentUser = (userId) => User.findOne({ userId });
-
-const canAccessTicket = (user, ticket) => {
-    if (user.userType === constants.userType.superAdmin) return true;
-    if (!sameCompany(user.companyId, ticket.companyId)) return false;
-    if (user.userType === constants.userType.admin) return true;
-    if (user.userType === constants.userType.engineer) return ticket.assignee === user.userId;
-    return ticket.reporter === user.userId;
-};
 
 const validatePriority = (value) => {
     const priority = Number(value);
