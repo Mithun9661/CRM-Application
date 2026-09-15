@@ -8,6 +8,7 @@ const User = require("./Models/user.model");
 const Company = require("./Models/company.model");
 const bcrypt = require("bcryptjs");
 const cors = require("cors");
+const { rateLimit } = require("express-rate-limit");
 
 const constants = require("./utils/constants");
 const swaggerUi = require("swagger-ui-express");
@@ -26,13 +27,18 @@ const allowedOrigins = String(
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+
 app.use(
     cors({
         origin(origin, callback) {
             if (!origin || allowedOrigins.includes(origin)) {
                 return callback(null, true);
             }
-            return callback(new Error("Origin is not allowed by CORS"));
+            const error = new Error("Origin is not allowed by CORS");
+            error.statusCode = 403;
+            return callback(error);
         },
         credentials: true,
         methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -45,11 +51,32 @@ app.use((req, res, next) => {
     res.setHeader("X-Frame-Options", "DENY");
     res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
     next();
 });
 
 app.use(express.json({ limit: "1mb" }));
-app.use(morgan("combined"));
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev"));
+
+const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 600,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { success: false, message: "Too many requests. Please try again later." }
+});
+
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: { success: false, message: "Too many login attempts. Please try again later." }
+});
+
+app.use("/crm/api/v1", apiLimiter);
+app.use("/crm/api/v1/auth/signin", authLimiter);
 
 console.log("Starting server...");
 
@@ -128,33 +155,38 @@ console.log("Starting server...");
         }
 
     } catch (err) {
-        console.log("MongoDB Error:", err);
+        console.error("MongoDB Error:", err.message);
     }
 })();
 
-// ================= HOME ROUTE =================
+// ================= HOME / HEALTH =================
 
 app.get("/", (req, res) => {
     res.send(`
         <!DOCTYPE html>
         <html>
         <head>
-            <title>EnterpriseFlow CRM</title>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>EnterpriseFlow CRM API</title>
         </head>
         <body>
-            <h1>EnterpriseFlow - Multi-Company CRM API 🚀</h1>
-            <p>Server is running successfully!</p>
+            <h1>EnterpriseFlow - Multi-Company CRM API</h1>
+            <p>Server is running successfully.</p>
             <p><a href="/api-docs">Open Swagger API Documentation</a></p>
+            <p><a href="/health">Service Health</a></p>
         </body>
         </html>
     `);
 });
 
 app.get("/health", (req, res) => {
-    res.status(200).send({
-        status: "ok",
+    const databaseConnected = mongoose.connection.readyState === 1;
+    res.status(databaseConnected ? 200 : 503).send({
+        status: databaseConnected ? "ok" : "degraded",
         service: "EnterpriseFlow CRM API",
-        database: mongoose.connection.readyState === 1 ? "connected" : "disconnected",
+        database: databaseConnected ? "connected" : "disconnected",
+        environment: process.env.NODE_ENV || "development",
         timestamp: new Date().toISOString()
     });
 });
@@ -185,13 +217,23 @@ app.use(
     "/api-docs",
     swaggerUi.serve,
     swaggerUi.setup(swaggerSpec, {
+        customSiteTitle: "EnterpriseFlow CRM API Docs",
         swaggerOptions: {
-            persistAuthorization: true
+            persistAuthorization: true,
+            displayRequestDuration: true
         }
     })
 );
 
-// ================= ERROR HANDLER =================
+// ================= 404 + ERROR HANDLER =================
+
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: "Route not found",
+        path: req.originalUrl
+    });
+});
 
 app.use(errorHandler);
 
