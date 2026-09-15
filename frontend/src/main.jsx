@@ -4,7 +4,6 @@ import './index.css'
 import App from './App.jsx'
 import './LoginPolish.css'
 import './reference-fix.css'
-import './exact-login.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
