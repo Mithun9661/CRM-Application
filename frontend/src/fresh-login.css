@@ -1,7 +1,7 @@
 /* Final visual alignment against the user's preferred reference. */
 .reference-login{background:#03111c!important;overflow-x:hidden}
 .ref-main{grid-template-columns:61.5% 38.5%!important}
-.ref-hero{background:#03111c url('/crm-user-hero.webp') center top/cover no-repeat!important;min-height:852px!important}
+.ref-hero{background:radial-gradient(circle at 68% 42%,rgba(0,112,154,.20),transparent 26%),linear-gradient(90deg,#020d16 0%,#051827 58%,#03111c 100%)!important;min-height:852px!important}
 .ref-copy{left:3.9vw!important;top:172px!important;width:455px!important}
 .ref-copy h1{font-size:60px!important;line-height:1.04!important;letter-spacing:-2.5px!important;text-shadow:0 4px 24px rgba(0,0,0,.28)}
 .ref-copy>p{font-size:18px!important;line-height:1.65!important;color:#d2dce5!important}
