@@ -1,51 +1,37 @@
+const mongoose = require("mongoose");
 const Ticket = require("../Models/ticket.model");
 
-const validateCommentRequestBody = async(req,res,next) =>{
+const loadTicket = async (req, res, next) => {
+  const { ticketId } = req.params;
+  if (!ticketId || !mongoose.Types.ObjectId.isValid(ticketId)) {
+    return res.status(400).send({ message: "Invalid ticket id" });
+  }
 
-    //Validate if the ticketId is present
-    if(!req.params.ticketId){
-        return res.status(400).send({
-            message : "Failed ! Ticket id is not present in the path param"
-        })
-    }
-    //Need to check if it's a valid ticket
-    const ticket = await Ticket.findOne({
-        _id : req.params.ticketId
-    })
+  const ticket = await Ticket.findById(ticketId);
+  if (!ticket) return res.status(404).send({ message: "Ticket not found" });
 
-    if(!ticket){
-        return res.ststus(400).send({
-            message : "Failed ! Ticket id passed is not valid"
-        });
-    }
+  req.ticket = ticket;
+  next();
+};
 
-    //Validation of content - It can't be empty
-    if(!req.body.content){
-        return res.status(400).send({
-            message : "Failed ! Content of the comment can't be empty"
+const validateCommentRequestBody = async (req, res, next) => {
+  try {
+    const content = String(req.body.content || "").trim();
+    if (!content) return res.status(400).send({ message: "Comment cannot be empty" });
+    if (content.length > 2000) return res.status(400).send({ message: "Comment cannot exceed 2000 characters" });
+    req.body.content = content;
+    return loadTicket(req, res, next);
+  } catch (err) {
+    return res.status(500).send({ message: "Unable to validate comment request" });
+  }
+};
 
-        });
-    
-    }
-    next();
-}
+const validateTicketId = async (req, res, next) => {
+  try {
+    return loadTicket(req, res, next);
+  } catch (err) {
+    return res.status(500).send({ message: "Unable to validate ticket" });
+  }
+};
 
-const validateTicketId = async(req,res,next) =>{
-
-    //Need to check if it's a valid ticket
-    const ticket = await Ticket.findOne({
-        _id : req.params.ticketId
-    })
-
-    if(!ticket){
-        return res.ststus(400).send({
-            message : "Failed ! Ticket id passed is not valid"
-        });
-    }
-    next();
-}
-
-module.exports = {
-    validateCommentRequestBody : validateCommentRequestBody,
-    validateTicketId : validateTicketId
-}
+module.exports = { validateCommentRequestBody, validateTicketId };
