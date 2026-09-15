@@ -1,0 +1,6 @@
+@media (min-width:901px){
+  .field:has(input:not(:placeholder-shown)){background:transparent!important;box-shadow:none!important}
+  .field:has(input:not(:placeholder-shown)) input{color:transparent!important}
+  .field:focus-within{background:rgba(10,36,54,.96)!important;box-shadow:inset 0 0 0 1px rgba(72,101,121,.85)!important}
+  .field:focus-within input{color:#eef8ff!important}
+}
