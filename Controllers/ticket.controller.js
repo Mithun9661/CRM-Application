@@ -105,7 +105,7 @@ exports.updateTicket = async (req, res) => {
             }
             if (req.body.assignee) {
                 const assignee = await User.findOne({ userId: req.body.assignee, userType: constants.userType.engineer });
-                if (!assignee || (user.userType !== constants.userType.superAdmin && !sameCompany(assignee.companyId, ticket.companyId))) {
+                if (!assignee || !sameCompany(assignee.companyId, ticket.companyId)) {
                     return res.status(400).send({ message: "Assignee must be an engineer from the same company" });
                 }
             }
