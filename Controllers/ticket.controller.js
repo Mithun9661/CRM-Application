@@ -47,6 +47,11 @@ const canAccessTicket = (user, ticket) => {
     return ticket.reporter === user.userId;
 };
 
+const validatePriority = (value) => {
+    const priority = Number(value);
+    return Number.isInteger(priority) && priority >= 1 && priority <= 5 ? priority : null;
+};
+
 exports.createTicket = async (req, res) => {
     try {
         const user = await getCurrentUser(req.userId);
@@ -55,11 +60,27 @@ exports.createTicket = async (req, res) => {
             return res.status(400).send({ message: "User is not assigned to a company" });
         }
 
+        const priority = validatePriority(req.body.ticketPriority ?? 4);
+        if (!priority) return res.status(400).send({ message: "Ticket priority must be between 1 and 5" });
+
+        const privilegedCreator = [
+            constants.userType.engineer,
+            constants.userType.admin,
+            constants.userType.superAdmin
+        ].includes(user.userType);
+        const requestedStatus = privilegedCreator && req.body.status
+            ? req.body.status
+            : constants.ticketStatuses.open;
+
+        if (!Object.values(constants.ticketStatuses).includes(requestedStatus)) {
+            return res.status(400).send({ message: "Invalid ticket status" });
+        }
+
         const ticketObj = {
-            title: req.body.title,
-            ticketPriority: req.body.ticketPriority || 4,
-            description: req.body.description,
-            status: req.body.status || constants.ticketStatuses.open,
+            title: String(req.body.title || "").trim(),
+            ticketPriority: priority,
+            description: String(req.body.description || "").trim(),
+            status: requestedStatus,
             reporter: user.userId,
             companyId: user.companyId || null
         };
@@ -85,7 +106,7 @@ exports.createTicket = async (req, res) => {
 
         const ticket = await Ticket.create(ticketObj);
 
-        if (engineer) {
+        if (engineer && engineer.userId !== user.userId) {
             await notifyUsers({
                 recipients: [engineer.userId],
                 companyId: ticket.companyId,
@@ -113,6 +134,13 @@ exports.updateTicket = async (req, res) => {
         if (!user) return res.status(401).send({ message: "User not found or unauthorized" });
         if (!canAccessTicket(user, ticket)) return res.status(403).send({ message: "You are not authorized to update this ticket" });
 
+        if (
+            user.userType === constants.userType.customer &&
+            (req.body.status !== undefined || req.body.ticketPriority !== undefined || req.body.assignee !== undefined)
+        ) {
+            return res.status(403).send({ message: "Customers cannot change ticket status, priority or assignment" });
+        }
+
         const oldTicket = {
             title: ticket.title,
             description: ticket.description,
@@ -121,10 +149,19 @@ exports.updateTicket = async (req, res) => {
             assignee: ticket.assignee
         };
 
-        if (req.body.title !== undefined) ticket.title = req.body.title;
-        if (req.body.description !== undefined) ticket.description = req.body.description;
-        if (req.body.ticketPriority !== undefined) ticket.ticketPriority = req.body.ticketPriority;
-        if (req.body.status !== undefined) ticket.status = req.body.status;
+        if (req.body.title !== undefined) ticket.title = String(req.body.title).trim();
+        if (req.body.description !== undefined) ticket.description = String(req.body.description).trim();
+        if (req.body.ticketPriority !== undefined) {
+            const priority = validatePriority(req.body.ticketPriority);
+            if (!priority) return res.status(400).send({ message: "Ticket priority must be between 1 and 5" });
+            ticket.ticketPriority = priority;
+        }
+        if (req.body.status !== undefined) {
+            if (!Object.values(constants.ticketStatuses).includes(req.body.status)) {
+                return res.status(400).send({ message: "Invalid ticket status" });
+            }
+            ticket.status = req.body.status;
+        }
 
         if (req.body.assignee !== undefined) {
             if (![constants.userType.admin, constants.userType.superAdmin].includes(user.userType)) {
@@ -209,10 +246,8 @@ exports.getAllTicket = async (req, res) => {
         }
 
         if (req.query.priority) {
-            const priority = Number(req.query.priority);
-            if (!Number.isInteger(priority) || priority < 1 || priority > 5) {
-                return res.status(400).send({ message: "Priority filter must be between 1 and 5" });
-            }
+            const priority = validatePriority(req.query.priority);
+            if (!priority) return res.status(400).send({ message: "Priority filter must be between 1 and 5" });
             queryObj.ticketPriority = priority;
         }
 
@@ -220,7 +255,7 @@ exports.getAllTicket = async (req, res) => {
             req.query.assignee &&
             [constants.userType.admin, constants.userType.superAdmin].includes(user.userType)
         ) {
-            queryObj.assignee = req.query.assignee;
+            queryObj.assignee = String(req.query.assignee).trim();
         }
 
         const searchText = String(req.query.search || req.query.title || "").trim();
