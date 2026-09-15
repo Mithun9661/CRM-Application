@@ -1,21 +1,36 @@
 const swaggerJsDoc = require("swagger-jsdoc");
 const path = require("path");
 
+const apiBaseUrl = process.env.API_BASE_URL || "https://crm-application-ahkr.onrender.com/crm/api/v1";
+
 const options = {
   definition: {
-    openapi: "3.0.0",
+    openapi: "3.0.3",
     info: {
-      title: "CRM Ticketing API",
+      title: "EnterpriseFlow Multi-Company CRM API",
       version: "1.0.0",
-      description: "CRM Ticketing System API Documentation"
+      description:
+        "Production REST API for multi-company CRM service-desk workflows, tenant-aware users, tickets, comments, notifications and analytics."
     },
-
     servers: [
       {
-        url: "http://localhost:7777/crm/api/v1"
+        url: apiBaseUrl,
+        description: "Production"
+      },
+      {
+        url: "http://localhost:7777/crm/api/v1",
+        description: "Local development"
       }
     ],
-
+    tags: [
+      { name: "Auth", description: "Authentication and account access" },
+      { name: "Users", description: "Tenant-aware user and role management" },
+      { name: "Companies", description: "Super Admin company management" },
+      { name: "Tickets", description: "Support ticket lifecycle and assignment" },
+      { name: "Comments", description: "Ticket collaboration" },
+      { name: "Notifications", description: "Persistent CRM notification inbox" },
+      { name: "Dashboard", description: "Role-aware CRM analytics" }
+    ],
     components: {
       securitySchemes: {
         bearerAuth: {
@@ -24,20 +39,9 @@ const options = {
           bearerFormat: "JWT"
         }
       }
-    },
-
-    security: [
-      {
-        bearerAuth: []
-      }
-    ]
+    }
   },
-
   apis: [path.join(__dirname, "../Routes/*.js")]
 };
 
-const swaggerSpec = swaggerJsDoc(options);
-
-console.log("Swagger Paths =", swaggerSpec.paths);
-
-module.exports = swaggerSpec;
+module.exports = swaggerJsDoc(options);
