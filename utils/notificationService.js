@@ -83,8 +83,13 @@ const notifyUsers = async ({ recipients, companyId = null, ticketId = null, type
     );
 
     try {
+      const emailRecipients = [...uniqueRecipients];
+      if (title === "New ticket assigned" && createdBy && createdBy !== "SYSTEM") {
+        emailRecipients.push(createdBy);
+      }
+
       await sendEmailNotifications({
-        recipients: uniqueRecipients,
+        recipients: [...new Set(emailRecipients)],
         title,
         message,
         ticketId
