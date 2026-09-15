@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import "./ticket-details.css";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7777/crm/api/v1";
@@ -13,14 +13,37 @@ function TicketDetails({ ticket, onClose, onChanged }) {
   const [details, setDetails] = useState(ticket || null);
   const [comments, setComments] = useState([]);
   const [history, setHistory] = useState([]);
+  const [engineers, setEngineers] = useState([]);
   const [comment, setComment] = useState("");
   const [status, setStatus] = useState(ticket?.status || "OPEN");
+  const [assignee, setAssignee] = useState(ticket?.assignee || "");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [assigning, setAssigning] = useState(false);
   const [posting, setPosting] = useState(false);
   const [message, setMessage] = useState("");
 
   const token = localStorage.getItem("crmToken");
+  const currentUser = useMemo(() => {
+    try { return JSON.parse(localStorage.getItem("crmUser") || "{}"); } catch { return {}; }
+  }, []);
+  const canAssign = ["ADMIN", "SUPER_ADMIN"].includes(currentUser?.userType);
+
+  const loadEngineers = async (ticketData) => {
+    if (!canAssign || !token) return;
+    try {
+      const response = await fetch(`${API_URL}/users?userType=ENGINEER&userStatus=APPROVED`, {
+        headers: { "x-access-token": token }
+      });
+      const data = await response.json();
+      if (!response.ok) return;
+      const list = Array.isArray(data) ? data : data.users || data.data || [];
+      const ticketCompany = String(ticketData?.companyId || "");
+      setEngineers(list.filter((item) => String(item.companyId || "") === ticketCompany));
+    } catch {
+      setEngineers([]);
+    }
+  };
 
   const loadAll = async () => {
     if (!ticket?._id || !token) return;
@@ -46,8 +69,10 @@ function TicketDetails({ ticket, onClose, onChanged }) {
 
       setDetails(ticketData);
       setStatus(ticketData.status || "OPEN");
+      setAssignee(ticketData.assignee || "");
       setComments(Array.isArray(commentsData) ? commentsData : []);
       setHistory(Array.isArray(historyData) ? historyData.slice().reverse() : []);
+      await loadEngineers(ticketData);
     } catch (err) {
       setMessage(err.message || "Unable to load ticket details");
     } finally {
@@ -74,7 +99,6 @@ function TicketDetails({ ticket, onClose, onChanged }) {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Status update failed");
-      setDetails(data.ticket || { ...details, status });
       setMessage("Ticket status updated successfully");
       await loadAll();
       if (onChanged) onChanged();
@@ -82,6 +106,31 @@ function TicketDetails({ ticket, onClose, onChanged }) {
       setMessage(err.message || "Status update failed");
     } finally {
       setSaving(false);
+    }
+  };
+
+  const updateAssignee = async () => {
+    if (!details || assignee === (details.assignee || "")) return;
+    setAssigning(true);
+    setMessage("");
+    try {
+      const response = await fetch(`${API_URL}/tickets/${details._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-token": token
+        },
+        body: JSON.stringify({ assignee })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Engineer assignment failed");
+      setMessage(assignee ? `Ticket assigned to ${assignee}` : "Ticket unassigned");
+      await loadAll();
+      if (onChanged) onChanged();
+    } catch (err) {
+      setMessage(err.message || "Engineer assignment failed");
+    } finally {
+      setAssigning(false);
     }
   };
 
@@ -145,16 +194,31 @@ function TicketDetails({ ticket, onClose, onChanged }) {
                 <p>{details?.description || "No description available."}</p>
               </div>
 
-              <div className="ticket-status-editor">
-                <div><span>Update status</span><small>Move this request through the support workflow.</small></div>
-                <div className="ticket-status-controls">
-                  <select value={status} onChange={(event) => setStatus(event.target.value)}>
-                    <option value="OPEN">OPEN</option>
-                    <option value="IN_PROGRESS">IN PROGRESS</option>
-                    <option value="CLOSED">CLOSED</option>
-                  </select>
-                  <button onClick={updateStatus} disabled={saving || status === details?.status}>{saving ? "Updating..." : "Save Status"}</button>
+              <div className="ticket-admin-controls">
+                <div className="ticket-status-editor">
+                  <div><span>Update status</span><small>Move this request through the support workflow.</small></div>
+                  <div className="ticket-status-controls">
+                    <select value={status} onChange={(event) => setStatus(event.target.value)}>
+                      <option value="OPEN">OPEN</option>
+                      <option value="IN_PROGRESS">IN PROGRESS</option>
+                      <option value="CLOSED">CLOSED</option>
+                    </select>
+                    <button onClick={updateStatus} disabled={saving || status === details?.status}>{saving ? "Updating..." : "Save Status"}</button>
+                  </div>
                 </div>
+
+                {canAssign && (
+                  <div className="ticket-status-editor assignment-editor">
+                    <div><span>Assign engineer</span><small>Route this ticket to an approved engineer in the same company.</small></div>
+                    <div className="ticket-status-controls">
+                      <select value={assignee} onChange={(event) => setAssignee(event.target.value)}>
+                        <option value="">Unassigned</option>
+                        {engineers.map((engineer) => <option key={engineer.userId} value={engineer.userId}>{engineer.name || engineer.userId} ({engineer.userId})</option>)}
+                      </select>
+                      <button onClick={updateAssignee} disabled={assigning || assignee === (details?.assignee || "")}>{assigning ? "Assigning..." : "Save Assignee"}</button>
+                    </div>
+                  </div>
+                )}
               </div>
             </section>
 
