@@ -25,6 +25,7 @@ exports.findById = async (req, res) => {
   try {
     const currentUser = req.currentUser || await User.findOne({ userId: req.userId });
     const user = await User.findOne({ userId: req.params.userId });
+    if (!currentUser) return res.status(401).send({ message: "User not found" });
     if (!user) return res.status(404).send({ message: "User with the given id not present" });
 
     if (currentUser.userType !== constants.userType.superAdmin && !sameCompany(currentUser.companyId, user.companyId)) {
@@ -40,13 +41,29 @@ exports.updateUser = async (req, res) => {
   try {
     const currentUser = req.currentUser || await User.findOne({ userId: req.userId });
     const target = await User.findOne({ userId: req.params.userId });
+    if (!currentUser) return res.status(401).send({ message: "User not found" });
     if (!target) return res.status(404).send({ message: "User not found" });
 
     if (currentUser.userType !== constants.userType.superAdmin && !sameCompany(currentUser.companyId, target.companyId)) {
       return res.status(403).send({ message: "You cannot update users from another company" });
     }
-    if (currentUser.userType !== constants.userType.superAdmin && req.body.userType === constants.userType.superAdmin) {
-      return res.status(403).send({ message: "Company admin cannot create or promote a Super Admin" });
+
+    // Platform Super Admin accounts are protected from ordinary user-management changes.
+    if (target.userType === constants.userType.superAdmin) {
+      return res.status(403).send({ message: "Super Admin account is protected" });
+    }
+
+    if (currentUser.userType === constants.userType.admin) {
+      // Company admins manage customers and engineers, but cannot manage peer admins or platform admins.
+      if (target.userType === constants.userType.admin) {
+        return res.status(403).send({ message: "Company Admin cannot modify another Admin account" });
+      }
+      if (req.body.userType && ![constants.userType.customer, constants.userType.engineer].includes(req.body.userType)) {
+        return res.status(403).send({ message: "Company Admin can assign only CUSTOMER or ENGINEER roles" });
+      }
+      if (req.body.companyId !== undefined) {
+        return res.status(403).send({ message: "Only Super Admin can move users between companies" });
+      }
     }
 
     if (req.body.name !== undefined) target.name = req.body.name;
@@ -58,7 +75,10 @@ exports.updateUser = async (req, res) => {
     }
 
     await target.save();
-    return res.status(200).send({ message: "User record has been successfully updated" });
+    return res.status(200).send({
+      message: "User record has been successfully updated",
+      user: objectConverter.userResponse([target])[0]
+    });
   } catch (err) {
     return res.status(500).send({ message: err.message || "Some internal error while updating the user record" });
   }
