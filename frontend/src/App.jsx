@@ -3,6 +3,8 @@ import { useEffect, useState } from "react";
 import TicketDetails from "./TicketDetails";
 import UserManagement from "./UserManagement";
 import CompanyManagement from "./CompanyManagement";
+import AdvancedTickets from "./AdvancedTickets";
+import NotificationCenter from "./NotificationCenter";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7777/crm/api/v1";
 
@@ -34,12 +36,9 @@ function App() {
   const [dashboardLoading, setDashboardLoading] = useState(false);
   const [dashboardMessage, setDashboardMessage] = useState("");
 
-  const [tickets, setTickets] = useState([]);
-  const [ticketsLoading, setTicketsLoading] = useState(false);
-  const [ticketMessage, setTicketMessage] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState({});
-  const [updatingTicketId, setUpdatingTicketId] = useState("");
   const [selectedTicket, setSelectedTicket] = useState(null);
+  const [ticketRefreshVersion, setTicketRefreshVersion] = useState(0);
+  const [ticketMessage, setTicketMessage] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [ticketPriority, setTicketPriority] = useState("3");
@@ -58,8 +57,8 @@ function App() {
     }
   }, []);
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleLogin = async (event) => {
+    event.preventDefault();
     setMessage("Signing in...");
     try {
       const response = await fetch(`${API_URL}/auth/signin`, {
@@ -76,6 +75,7 @@ function App() {
         email: data.email || "",
         userStatus: data.userStatus || "",
         userType: data.userType || "",
+        companyId: data.companyId || null,
         companyName: data.companyName || ""
       };
 
@@ -89,15 +89,6 @@ function App() {
       setMessage("Cannot connect to backend server");
     }
   };
-
-  const extractTickets = (data) =>
-    Array.isArray(data)
-      ? data
-      : Array.isArray(data?.tickets)
-        ? data.tickets
-        : Array.isArray(data?.data)
-          ? data.data
-          : [];
 
   const loadDashboard = async () => {
     const token = localStorage.getItem("crmToken");
@@ -137,86 +128,38 @@ function App() {
     }
   };
 
-  const loadTickets = async () => {
-    const token = localStorage.getItem("crmToken");
-    setTicketsLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/tickets`, {
-        headers: { "x-access-token": token }
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setTickets([]);
-        return setTicketMessage(data.message || "Failed to load tickets");
-      }
-      const list = extractTickets(data);
-      setTickets(list);
-      const selected = {};
-      list.forEach((ticket) => {
-        selected[ticket._id] = ticket.status || "OPEN";
-      });
-      setSelectedStatuses(selected);
-      setTicketMessage(list.length ? "" : "No tickets found");
-    } catch {
-      setTicketMessage("Cannot connect to backend");
-    } finally {
-      setTicketsLoading(false);
-    }
-  };
-
-  const handleUpdateStatus = async (ticket) => {
-    const token = localStorage.getItem("crmToken");
-    const status = selectedStatuses[ticket._id] || ticket.status;
-    if (status === ticket.status) return;
-
-    setUpdatingTicketId(ticket._id);
-    try {
-      const response = await fetch(`${API_URL}/tickets/${ticket._id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          "x-access-token": token
-        },
-        body: JSON.stringify({ status })
-      });
-      const data = await response.json();
-      if (!response.ok) return setTicketMessage(data.message || "Update failed");
-      setTicketMessage("Ticket updated successfully");
-      await loadDashboard();
-      await loadTickets();
-    } catch {
-      setTicketMessage("Update failed");
-    } finally {
-      setUpdatingTicketId("");
-    }
-  };
-
-  const handleCreateTicket = async (e) => {
-    e.preventDefault();
+  const handleCreateTicket = async (event) => {
+    event.preventDefault();
     const token = localStorage.getItem("crmToken");
     setTicketMessage("Creating ticket...");
     try {
+      const payload = {
+        title,
+        description,
+        ticketPriority: Number(ticketPriority)
+      };
+      if (user?.userType !== "CUSTOMER") payload.status = ticketStatus;
+
       const response = await fetch(`${API_URL}/tickets`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "x-access-token": token
         },
-        body: JSON.stringify({
-          title,
-          description,
-          ticketPriority: Number(ticketPriority),
-          status: ticketStatus
-        })
+        body: JSON.stringify(payload)
       });
       const data = await response.json();
       if (!response.ok) return setTicketMessage(data.message || "Failed to create ticket");
 
       setTitle("");
       setDescription("");
+      setTicketPriority("3");
+      setTicketStatus("OPEN");
       setTicketMessage("Ticket created successfully");
       await loadDashboard();
-      await loadTickets();
+      setTicketRefreshVersion((value) => value + 1);
+      window.dispatchEvent(new Event("crm:tickets-changed"));
+      window.dispatchEvent(new Event("crm:notifications-changed"));
       setActivePage("Tickets");
     } catch {
       setTicketMessage("Cannot connect to backend");
@@ -228,7 +171,6 @@ function App() {
     setActivePage(page);
     setTicketMessage("");
     if (page === "Dashboard") loadDashboard();
-    if (page === "Tickets") loadTickets();
   };
 
   useEffect(() => {
@@ -303,9 +245,9 @@ function App() {
               <p>Sign in to your CRM account</p>
               <form onSubmit={handleLogin}>
                 <label>Username / Email</label>
-                <div className="field"><span>♙</span><input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="Enter your username or email" required /></div>
+                <div className="field"><span>♙</span><input value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="Enter your username or email" required /></div>
                 <label>Password</label>
-                <div className="field"><span>♢</span><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" required /><button type="button" className="eye" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "◉" : "◎"}</button></div>
+                <div className="field"><span>♢</span><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Enter your password" required /><button type="button" className="eye" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "◉" : "◎"}</button></div>
                 <div className="ref-options"><label><input type="checkbox" /> Remember me</label><button type="button">Forgot password?</button></div>
                 <button className="ref-signin">Sign In <span>→</span></button>
               </form>
@@ -325,7 +267,11 @@ function App() {
     <div>
       <nav className="navbar">
         <h2>EnterpriseFlow CRM</h2>
-        <div><span>{user?.companyName || "Enterprise Workspace"} · {user?.name || "User"} · {user?.userType?.replace("_", " ")}</span><button onClick={logout}>Logout</button></div>
+        <div>
+          <NotificationCenter onOpenTicket={setSelectedTicket} />
+          <span>{user?.companyName || "Enterprise Workspace"} · {user?.name || "User"} · {user?.userType?.replace("_", " ")}</span>
+          <button onClick={logout}>Logout</button>
+        </div>
       </nav>
 
       <div className="dashboard">
@@ -436,27 +382,35 @@ function App() {
           )}
 
           {activePage === "Tickets" && (
-            <>
-              <div className="page-header"><div><h1>Support Tickets</h1><p>Monitor and manage customer requests.</p></div><button className="refresh-btn" onClick={loadTickets}>Refresh</button></div>
-              {ticketMessage && <p className="message">{ticketMessage}</p>}
-              {ticketsLoading ? <p>Loading tickets...</p> : tickets.length === 0 ? <div className="empty-state"><h3>No tickets yet</h3><p>Create a support request to get started.</p></div> : (
-                <div className="tickets-grid">
-                  {tickets.map((ticket) => (
-                    <div className="ticket-card" key={ticket._id}>
-                      <h3>{ticket.title}</h3><p>{ticket.description}</p><p><b>Priority:</b> {ticket.ticketPriority}</p><p><b>Status:</b> <span className="status">{ticket.status}</span></p><p><b>Reporter:</b> {ticket.reporter}</p>{ticket.assignee && <p><b>Assignee:</b> {ticket.assignee}</p>}
-                      <div className="update-status-section"><select value={selectedStatuses[ticket._id] || ticket.status} onChange={(e) => setSelectedStatuses((previous) => ({ ...previous, [ticket._id]: e.target.value }))}><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option value="CLOSED">CLOSED</option></select><button className="update-status-btn" onClick={() => handleUpdateStatus(ticket)} disabled={updatingTicketId === ticket._id}>{updatingTicketId === ticket._id ? "Updating..." : "Update Status"}</button></div>
-                      <button className="view-details-btn" onClick={() => setSelectedTicket(ticket)}>View Details & Activity</button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </>
+            <AdvancedTickets
+              currentUser={user}
+              onOpenTicket={setSelectedTicket}
+              refreshVersion={ticketRefreshVersion}
+              onChanged={() => {
+                loadDashboard();
+                window.dispatchEvent(new Event("crm:notifications-changed"));
+              }}
+            />
           )}
 
           {activePage === "Create Ticket" && (
             <>
-              <h1>Create Support Ticket</h1><p>Submit a new customer or internal support request.</p>
-              <div className="ticket-form-container"><form className="ticket-form" onSubmit={handleCreateTicket}><label>Ticket title</label><input value={title} onChange={(e) => setTitle(e.target.value)} required /><label>Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} required /><label>Priority</label><select value={ticketPriority} onChange={(e) => setTicketPriority(e.target.value)}>{[1, 2, 3, 4, 5].map((n) => <option key={n}>{n}</option>)}</select><label>Status</label><select value={ticketStatus} onChange={(e) => setTicketStatus(e.target.value)}><option>OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option>CLOSED</option></select><button className="create-btn">Create Ticket</button></form>{ticketMessage && <p className="message">{ticketMessage}</p>}</div>
+              <div className="page-header"><div><h1>Create Support Ticket</h1><p>Submit a new customer or internal support request.</p></div></div>
+              <div className="ticket-form-container">
+                <form className="ticket-form" onSubmit={handleCreateTicket}>
+                  <label>Ticket title</label>
+                  <input value={title} onChange={(event) => setTitle(event.target.value)} maxLength={160} required />
+                  <label>Description</label>
+                  <textarea value={description} onChange={(event) => setDescription(event.target.value)} maxLength={5000} required />
+                  <label>Priority</label>
+                  <select value={ticketPriority} onChange={(event) => setTicketPriority(event.target.value)}>{[1, 2, 3, 4, 5].map((value) => <option key={value} value={value}>Priority {value}</option>)}</select>
+                  {user?.userType !== "CUSTOMER" && (
+                    <><label>Status</label><select value={ticketStatus} onChange={(event) => setTicketStatus(event.target.value)}><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option value="CLOSED">CLOSED</option><option value="BLOCKED">BLOCKED</option></select></>
+                  )}
+                  <button className="create-btn">Create Ticket</button>
+                </form>
+                {ticketMessage && <p className="message">{ticketMessage}</p>}
+              </div>
             </>
           )}
 
@@ -471,7 +425,9 @@ function App() {
           onClose={() => setSelectedTicket(null)}
           onChanged={() => {
             loadDashboard();
-            loadTickets();
+            setTicketRefreshVersion((value) => value + 1);
+            window.dispatchEvent(new Event("crm:tickets-changed"));
+            window.dispatchEvent(new Event("crm:notifications-changed"));
           }}
         />
       )}
