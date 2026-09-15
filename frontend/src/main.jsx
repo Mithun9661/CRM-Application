@@ -6,6 +6,7 @@ import './LoginPolish.css'
 import './reference-fix.css'
 import './hero-section.css'
 import './fresh-login.css'
+import './dashboard-dark.css'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
