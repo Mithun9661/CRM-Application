@@ -1,545 +1,182 @@
 const User = require("../Models/user.model");
 const constants = require("../utils/constants");
 const Ticket = require("../Models/ticket.model");
-
 const { randomUUID: uuidv4 } = require("crypto");
-
 const { createRedis } = require("../utils/redisClient");
 const redisClient = createRedis();
-
 const dotenv = require("dotenv");
 dotenv.config();
 
 const QUEUE_KEY = process.env.QUEUE_KEY || "queue:notifications";
 
-/**
- * Send notification message to Redis
- */
+const sameCompany = (a, b) => String(a || "") === String(b || "");
+
+const enqueue = async (payload) => {
+    if (!redisClient) return;
+    const msg = JSON.stringify({ id: uuidv4(), ts: new Date().toISOString(), ...payload });
+    await redisClient.rpush(QUEUE_KEY, msg);
+};
+
 const sendMessageToRedis = async (req, engineer, ticket) => {
+    if (!redisClient) return;
     const emailList = [];
-
     try {
-        // Fetch user who created/updated the ticket
-        const user = await User.findOne({
-            userId: req.userId
-        });
-
-        if (user && user.email) {
-            emailList.push(user.email);
-        }
+        const user = await User.findOne({ userId: req.userId });
+        if (user?.email) emailList.push(user.email);
     } catch (err) {
-        console.log(
-            "Error while fetching the user object:",
-            err.message
-        );
+        console.log("Error while fetching user for notification:", err.message);
     }
-
-    // Add engineer email if assigned
-    if (engineer && engineer.email) {
-        emailList.push(engineer.email);
-    }
-
-    /**
-     * Create notification message
-     */
-    const ticketLink =
-        process.env.BASE_URL || "http://127.0.0.1:7777";
-
-    const message = {
-        emailList: emailList,
-        ticketLink: `${ticketLink}/crm/api/v1/tickets/${ticket._id}`
-    };
-
+    if (engineer?.email) emailList.push(engineer.email);
+    const ticketLink = process.env.BASE_URL || "http://127.0.0.1:7777";
     try {
-        await enqueue(message);
-        console.log("Message passed to Redis");
+        await enqueue({ emailList, ticketLink: `${ticketLink}/crm/api/v1/tickets/${ticket._id}` });
     } catch (err) {
-        console.log(
-            "Error while passing the message to Redis:",
-            err.message
-        );
+        console.log("Error while passing message to Redis:", err.message);
     }
 };
 
-/**
- * Create a new ticket
- * Ticket is automatically assigned to an available engineer if found
- */
+const getCurrentUser = (userId) => User.findOne({ userId });
+
+const canAccessTicket = (user, ticket) => {
+    if (user.userType === constants.userType.superAdmin) return true;
+    if (!sameCompany(user.companyId, ticket.companyId)) return false;
+    if (user.userType === constants.userType.admin) return true;
+    if (user.userType === constants.userType.engineer) return ticket.assignee === user.userId;
+    return ticket.reporter === user.userId;
+};
+
 exports.createTicket = async (req, res) => {
-    console.log("BODY =", req.body);
-    console.log("USER =", req.userId);
-
-    const ticketObj = {
-        title: req.body.title,
-        ticketPriority: req.body.ticketPriority,
-        description: req.body.description,
-        status: req.body.status || "OPEN",
-        reporter: req.userId
-    };
-
-    // Create initial ticket history
-    ticketObj.ticketHistory = [
-        {
-            action: "TICKET_CREATED",
-            updatedBy: req.userId,
-            newValue: {
-                title: ticketObj.title,
-                description: ticketObj.description,
-                ticketPriority: ticketObj.ticketPriority,
-                status: ticketObj.status
-            }
-        }
-    ];
-
     try {
-        /**
-         * Auto assign an approved engineer if available
-         */
-        const engineer = await User.findOne({
-            userType: constants.userType.engineer,
-            userStatus: constants.userStatuses.approved
-        });
-
-        if (engineer) {
-            ticketObj.assignee = engineer.userId;
+        const user = await getCurrentUser(req.userId);
+        if (!user) return res.status(401).send({ message: "User not found" });
+        if (user.userType !== constants.userType.superAdmin && !user.companyId) {
+            return res.status(400).send({ message: "User is not assigned to a company" });
         }
 
-        // Create ticket
-        const ticket = await Ticket.create(ticketObj);
-
-        // Send notification
-        if (ticket) {
-            await sendMessageToRedis(req, engineer, ticket);
-        }
-
-        return res.status(201).send(ticket);
-
-    } catch (err) {
-        console.log(
-            "Error while creating the ticket:",
-            err.message
-        );
-
-        return res.status(500).send({
-            message:
-                err.message ||
-                "Some error occurred while creating the ticket"
-        });
-    }
-};
-
-
-/**
- * Update ticket
- *
- * Allows:
- * - Reporter/Owner
- * - Engineer
- * - Admin
- *
- * Can update:
- * - title
- * - description
- * - ticketPriority
- * - status
- * - assignee
- */
-exports.updateTicket = async (req, res) => {
-    try {
-        /**
-         * Find ticket
-         */
-        const ticket = await Ticket.findById(req.params.id);
-
-        if (!ticket) {
-            return res.status(404).send({
-                message: "Ticket not found"
-            });
-        }
-
-        /**
-         * Find calling user
-         */
-        const callingUserDetails = await User.findOne({
-            userId: req.userId
-        });
-
-        if (!callingUserDetails) {
-            return res.status(401).send({
-                message: "User not found or unauthorized"
-            });
-        }
-
-        /**
-         * Check authorization
-         */
-        const isReporter = ticket.reporter === req.userId;
-
-        const isEngineer =
-            callingUserDetails.userType ===
-            constants.userType.engineer;
-
-        const isAdmin =
-            callingUserDetails.userType ===
-            constants.userType.admin;
-
-        if (!isReporter && !isEngineer && !isAdmin) {
-            return res.status(403).send({
-                message:
-                    "Ticket can only be updated by owner, engineer or admin"
-            });
-        }
-
-        /**
-         * IMPORTANT:
-         * Save OLD values before making changes
-         */
-        const oldTicket = {
-            title: ticket.title,
-            description: ticket.description,
-            ticketPriority: ticket.ticketPriority,
-            status: ticket.status,
-            assignee: ticket.assignee
+        const ticketObj = {
+            title: req.body.title,
+            ticketPriority: req.body.ticketPriority || 4,
+            description: req.body.description,
+            status: req.body.status || constants.ticketStatuses.open,
+            reporter: user.userId,
+            companyId: user.companyId || null
         };
 
-        /**
-         * Update only fields received in request
-         */
+        ticketObj.ticketHistory = [{
+            action: "TICKET_CREATED",
+            updatedBy: user.userId,
+            newValue: { title: ticketObj.title, description: ticketObj.description, ticketPriority: ticketObj.ticketPriority, status: ticketObj.status }
+        }];
 
-        if (req.body.title !== undefined) {
-            ticket.title = req.body.title;
-        }
+        const engineerQuery = {
+            userType: constants.userType.engineer,
+            userStatus: constants.userStatuses.approved
+        };
+        if (user.companyId) engineerQuery.companyId = user.companyId;
+        const engineer = await User.findOne(engineerQuery);
+        if (engineer) ticketObj.assignee = engineer.userId;
 
-        if (req.body.description !== undefined) {
-            ticket.description = req.body.description;
-        }
+        const ticket = await Ticket.create(ticketObj);
+        await sendMessageToRedis(req, engineer, ticket);
+        return res.status(201).send(ticket);
+    } catch (err) {
+        console.log("Error while creating ticket:", err.message);
+        return res.status(500).send({ message: err.message || "Some error occurred while creating the ticket" });
+    }
+};
 
-        if (req.body.ticketPriority !== undefined) {
-            ticket.ticketPriority = req.body.ticketPriority;
-        }
+exports.updateTicket = async (req, res) => {
+    try {
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) return res.status(404).send({ message: "Ticket not found" });
+        const user = await getCurrentUser(req.userId);
+        if (!user) return res.status(401).send({ message: "User not found or unauthorized" });
+        if (!canAccessTicket(user, ticket)) return res.status(403).send({ message: "You are not authorized to update this ticket" });
 
-        if (req.body.status !== undefined) {
-            ticket.status = req.body.status;
-        }
+        const oldTicket = { title: ticket.title, description: ticket.description, ticketPriority: ticket.ticketPriority, status: ticket.status, assignee: ticket.assignee };
+        if (req.body.title !== undefined) ticket.title = req.body.title;
+        if (req.body.description !== undefined) ticket.description = req.body.description;
+        if (req.body.ticketPriority !== undefined) ticket.ticketPriority = req.body.ticketPriority;
+        if (req.body.status !== undefined) ticket.status = req.body.status;
 
         if (req.body.assignee !== undefined) {
+            if (![constants.userType.admin, constants.userType.superAdmin].includes(user.userType)) {
+                return res.status(403).send({ message: "Only admin can reassign tickets" });
+            }
+            if (req.body.assignee) {
+                const assignee = await User.findOne({ userId: req.body.assignee, userType: constants.userType.engineer });
+                if (!assignee || (user.userType !== constants.userType.superAdmin && !sameCompany(assignee.companyId, ticket.companyId))) {
+                    return res.status(400).send({ message: "Assignee must be an engineer from the same company" });
+                }
+            }
             ticket.assignee = req.body.assignee;
         }
 
-        /**
-         * Add ticket history
-         */
         ticket.ticketHistory.push({
             action: "TICKET_UPDATED",
-            updatedBy: req.userId,
-
+            updatedBy: user.userId,
             oldValue: oldTicket,
-
-            newValue: {
-                title: ticket.title,
-                description: ticket.description,
-                ticketPriority: ticket.ticketPriority,
-                status: ticket.status,
-                assignee: ticket.assignee
-            }
+            newValue: { title: ticket.title, description: ticket.description, ticketPriority: ticket.ticketPriority, status: ticket.status, assignee: ticket.assignee }
         });
 
-        /**
-         * Save updated ticket
-         */
         const updatedTicket = await ticket.save();
-
-        /**
-         * Send notification to reporter and engineer
-         */
-        try {
-            let engineer = null;
-
-            if (updatedTicket.assignee) {
-                engineer = await User.findOne({
-                    userId: updatedTicket.assignee
-                });
-            }
-
-            await sendMessageToRedis(
-                req,
-                engineer,
-                updatedTicket
-            );
-
-        } catch (err) {
-            console.log(
-                "Error while sending ticket update notification:",
-                err.message
-            );
-        }
-
-        return res.status(200).send({
-            message: "Ticket updated successfully",
-            ticket: updatedTicket
-        });
-
+        const engineer = updatedTicket.assignee ? await User.findOne({ userId: updatedTicket.assignee }) : null;
+        await sendMessageToRedis(req, engineer, updatedTicket);
+        return res.status(200).send({ message: "Ticket updated successfully", ticket: updatedTicket });
     } catch (err) {
-        console.log(
-            "Error while updating ticket:",
-            err.message
-        );
-
-        return res.status(500).send({
-            message:
-                err.message ||
-                "Some error occurred while updating the ticket"
-        });
+        console.log("Error while updating ticket:", err.message);
+        return res.status(500).send({ message: err.message || "Some error occurred while updating the ticket" });
     }
 };
 
-
-/**
- * Fetch all tickets
- *
- * Customer -> Only own tickets
- * Engineer -> Only assigned tickets
- * Admin -> All tickets
- *
- * Supports:
- * - status
- * - priority
- * - assignee
- * - title search
- * - date range
- * - pagination
- */
 exports.getAllTicket = async (req, res) => {
     try {
+        const user = await getCurrentUser(req.userId);
+        if (!user) return res.status(401).send({ message: "User not found" });
         const queryObj = {};
 
-        /**
-         * Filter by status
-         */
-        if (req.query.status) {
-            queryObj.status = req.query.status;
-        }
+        if (user.userType !== constants.userType.superAdmin) queryObj.companyId = user.companyId;
+        if (user.userType === constants.userType.customer) queryObj.reporter = user.userId;
+        else if (user.userType === constants.userType.engineer) queryObj.assignee = user.userId;
 
-        /**
-         * Filter by priority
-         */
-        if (req.query.priority) {
-            queryObj.ticketPriority =
-                Number(req.query.priority);
-        }
+        if (req.query.status) queryObj.status = req.query.status;
+        if (req.query.priority) queryObj.ticketPriority = Number(req.query.priority);
+        if (req.query.assignee && [constants.userType.admin, constants.userType.superAdmin].includes(user.userType)) queryObj.assignee = req.query.assignee;
+        if (req.query.title) queryObj.title = { $regex: req.query.title, $options: "i" };
+        if (req.query.fromDate && req.query.toDate) queryObj.createdAt = { $gte: new Date(req.query.fromDate), $lte: new Date(req.query.toDate) };
 
-        /**
-         * Filter by assignee
-         */
-        if (req.query.assignee) {
-            queryObj.assignee = req.query.assignee;
-        }
-
-        /**
-         * Search by title
-         */
-        if (req.query.title) {
-            queryObj.title = {
-                $regex: req.query.title,
-                $options: "i"
-            };
-        }
-
-        /**
-         * Date range filter
-         */
-        if (req.query.fromDate && req.query.toDate) {
-            queryObj.createdAt = {
-                $gte: new Date(req.query.fromDate),
-                $lte: new Date(req.query.toDate)
-            };
-        }
-
-        /**
-         * Find current logged-in user
-         */
-        const savedUser = await User.findOne({
-            userId: req.userId
-        });
-
-        if (!savedUser) {
-            return res.status(401).send({
-                message: "User not found"
-            });
-        }
-
-        /**
-         * Apply role-based filtering
-         */
-        if (
-            savedUser.userType ===
-            constants.userType.customer
-        ) {
-            queryObj.reporter = savedUser.userId;
-
-        } else if (
-            savedUser.userType ===
-            constants.userType.engineer
-        ) {
-            queryObj.assignee = savedUser.userId;
-        }
-
-        /**
-         * Pagination
-         */
-        const page = Number(req.query.page) || 1;
-
-        const limit = Number(req.query.limit) || 5;
-
-        const skip = (page - 1) * limit;
-
-        /**
-         * Fetch tickets
-         */
-        const tickets = await Ticket.find(queryObj)
-            .sort({ createdAt: -1 })
-            .skip(skip)
-            .limit(limit);
-
-        /**
-         * Count tickets
-         */
-        const totalTickets =
-            await Ticket.countDocuments(queryObj);
-
-        return res.status(200).send({
-            page: page,
-            totalPages:
-                Math.ceil(totalTickets / limit) || 1,
-            totalTickets: totalTickets,
-            tickets: tickets
-        });
-
+        const page = Math.max(Number(req.query.page) || 1, 1);
+        const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
+        const totalTickets = await Ticket.countDocuments(queryObj);
+        const tickets = await Ticket.find(queryObj).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit);
+        return res.status(200).send({ page, totalPages: Math.ceil(totalTickets / limit) || 1, totalTickets, tickets });
     } catch (err) {
-        console.log(
-            "Error while fetching tickets:",
-            err.message
-        );
-
-        return res.status(500).send({
-            message:
-                err.message ||
-                "Some error occurred while fetching tickets"
-        });
+        return res.status(500).send({ message: err.message || "Some error occurred while fetching tickets" });
     }
 };
 
-
-/**
- * Fetch ticket based on ticket ID
- */
 exports.findTicketBasedOnId = async (req, res) => {
     try {
         const ticket = await Ticket.findById(req.params.id);
-
-        if (!ticket) {
-            return res.status(404).send({
-                message: "Ticket not found"
-            });
-        }
-
-        /**
-         * Get current user
-         */
-        const savedUser = await User.findOne({
-            userId: req.userId
-        });
-
-        if (!savedUser) {
-            return res.status(401).send({
-                message: "User not found"
-            });
-        }
-
-        /**
-         * Admin can access all tickets
-         * Reporter can access own ticket
-         * Assignee can access assigned ticket
-         */
-        if (
-            savedUser.userType ===
-                constants.userType.admin ||
-            ticket.reporter === req.userId ||
-            ticket.assignee === req.userId
-        ) {
-            return res.status(200).send(ticket);
-        }
-
-        return res.status(403).send({
-            message:
-                "Can't return the ticket details as you are not authorized"
-        });
-
+        if (!ticket) return res.status(404).send({ message: "Ticket not found" });
+        const user = await getCurrentUser(req.userId);
+        if (!user) return res.status(401).send({ message: "User not found" });
+        if (!canAccessTicket(user, ticket)) return res.status(403).send({ message: "You are not authorized to access this ticket" });
+        return res.status(200).send(ticket);
     } catch (err) {
-        console.log(
-            "Error while fetching ticket:",
-            err.message
-        );
-
-        return res.status(500).send({
-            message:
-                err.message ||
-                "Some error occurred while fetching ticket"
-        });
+        return res.status(500).send({ message: err.message || "Some error occurred while fetching ticket" });
     }
 };
 
-
-/**
- * Add a message to Redis queue
- */
-const enqueue = async (payload) => {
-    const msg = JSON.stringify({
-        id: uuidv4(),
-        ts: new Date().toISOString(),
-        ...payload
-    });
-
-    const len = await redisClient.rpush(
-        QUEUE_KEY,
-        msg
-    );
-
-    console.log(
-        `[Producer] enqueued -> ${msg} queue length: ${len}`
-    );
-};
-
-
-/**
- * Get ticket history
- */
 exports.getTicketHistory = async (req, res) => {
     try {
-        const ticket = await Ticket.findById(
-            req.params.id
-        );
-
-        if (!ticket) {
-            return res.status(404).send({
-                message: "Ticket not found"
-            });
-        }
-
-        return res.status(200).send(
-            ticket.ticketHistory || []
-        );
-
+        const ticket = await Ticket.findById(req.params.id);
+        if (!ticket) return res.status(404).send({ message: "Ticket not found" });
+        const user = await getCurrentUser(req.userId);
+        if (!user) return res.status(401).send({ message: "User not found" });
+        if (!canAccessTicket(user, ticket)) return res.status(403).send({ message: "You are not authorized to access this ticket history" });
+        return res.status(200).send(ticket.ticketHistory || []);
     } catch (err) {
-        console.log(
-            "Error while fetching ticket history:",
-            err.message
-        );
-
-        return res.status(500).send({
-            message:
-                err.message ||
-                "Some error occurred while fetching ticket history"
-        });
+        return res.status(500).send({ message: err.message || "Some error occurred while fetching ticket history" });
     }
 };
