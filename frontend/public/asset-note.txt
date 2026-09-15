@@ -1,0 +1,1 @@
+binary hero will be stored via git blob
