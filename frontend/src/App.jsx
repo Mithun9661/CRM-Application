@@ -1,126 +1,17 @@
 import "./App.css";
 import { useEffect, useState } from "react";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7777/crm/api/v1";
-
-function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState(null);
-  const [userId, setUserId] = useState("admin");
-  const [password, setPassword] = useState("Welcome1");
-  const [message, setMessage] = useState("");
-  const [activePage, setActivePage] = useState("Dashboard");
-  const [dashboardData, setDashboardData] = useState({ totalTickets: 0, openTickets: 0, inProgressTickets: 0, closedTickets: 0 });
-  const [tickets, setTickets] = useState([]);
-  const [ticketsLoading, setTicketsLoading] = useState(false);
-  const [ticketMessage, setTicketMessage] = useState("");
-  const [selectedStatuses, setSelectedStatuses] = useState({});
-  const [updatingTicketId, setUpdatingTicketId] = useState("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [ticketPriority, setTicketPriority] = useState("3");
-  const [ticketStatus, setTicketStatus] = useState("OPEN");
-  const [users, setUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [userMessage, setUserMessage] = useState("");
-  const [userTypeFilter, setUserTypeFilter] = useState("");
-  const [userStatusFilter, setUserStatusFilter] = useState("");
-
-  useEffect(() => {
-    const savedUser = localStorage.getItem("crmUser");
-    const token = localStorage.getItem("crmToken");
-    if (savedUser && token) {
-      try { setUser(JSON.parse(savedUser)); setIsLoggedIn(true); }
-      catch { localStorage.removeItem("crmUser"); localStorage.removeItem("crmToken"); }
-    }
-  }, []);
-
-  const handleLogin = async (e) => {
-    e.preventDefault(); setMessage("Logging in...");
-    try {
-      const response = await fetch(`${API_URL}/auth/signin`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, password }) });
-      const data = await response.json();
-      if (!response.ok) return setMessage(data.message || "Login failed");
-      if (!data.accessToken) return setMessage("Login successful but token not received");
-      const loggedInUser = { name: data.name || "User", userId: data.userId || userId, email: data.email || "", userStatus: data.userStatus || "" };
-      localStorage.setItem("crmToken", data.accessToken); localStorage.setItem("crmUser", JSON.stringify(loggedInUser));
-      setUser(loggedInUser); setIsLoggedIn(true); setMessage(""); setActivePage("Dashboard");
-    } catch { setMessage("Cannot connect to backend server"); }
-  };
-
-  const extractTickets = (data) => Array.isArray(data) ? data : Array.isArray(data?.tickets) ? data.tickets : Array.isArray(data?.data) ? data.data : [];
-
-  const loadDashboard = async () => {
-    const token = localStorage.getItem("crmToken"); if (!token) return;
-    try {
-      const response = await fetch(`${API_URL}/tickets`, { headers: { "Content-Type": "application/json", "x-access-token": token } });
-      const data = await response.json(); if (!response.ok) return;
-      const allTickets = extractTickets(data);
-      setDashboardData({ totalTickets: allTickets.length, openTickets: allTickets.filter(t => t.status === "OPEN").length, inProgressTickets: allTickets.filter(t => t.status === "IN_PROGRESS").length, closedTickets: allTickets.filter(t => t.status === "CLOSED").length });
-    } catch (error) { console.error(error); }
-  };
-
-  const loadTickets = async () => {
-    const token = localStorage.getItem("crmToken"); if (!token) return setTicketMessage("Please login again");
-    setTicketsLoading(true);
-    try {
-      const response = await fetch(`${API_URL}/tickets`, { headers: { "Content-Type": "application/json", "x-access-token": token } });
-      const data = await response.json();
-      if (!response.ok) { setTickets([]); return setTicketMessage(data.message || "Failed to load tickets"); }
-      const allTickets = extractTickets(data); setTickets(allTickets);
-      const map = {}; allTickets.forEach(t => map[t._id] = t.status || "OPEN"); setSelectedStatuses(map);
-      setTicketMessage(allTickets.length ? "" : "No tickets found");
-    } catch { setTickets([]); setTicketMessage("Cannot connect to backend"); }
-    finally { setTicketsLoading(false); }
-  };
-
-  const handleUpdateStatus = async (ticket) => {
-    const token = localStorage.getItem("crmToken"); if (!token) return setTicketMessage("Please login again");
-    const newStatus = selectedStatuses[ticket._id] || ticket.status;
-    if (newStatus === ticket.status) return setTicketMessage(`Ticket "${ticket.title}" already has ${newStatus} status`);
-    setUpdatingTicketId(ticket._id);
-    try {
-      const response = await fetch(`${API_URL}/tickets/${ticket._id}`, { method: "PUT", headers: { "Content-Type": "application/json", "x-access-token": token }, body: JSON.stringify({ status: newStatus }) });
-      const data = await response.json(); if (!response.ok) return setTicketMessage(data.message || "Failed to update ticket status");
-      setTicketMessage(`Ticket status updated successfully to ${newStatus}!`); await loadDashboard(); await loadTickets();
-    } catch { setTicketMessage("Cannot connect to backend while updating status"); }
-    finally { setUpdatingTicketId(""); }
-  };
-
-  const loadUsers = async (typeFilter = userTypeFilter, statusFilter = userStatusFilter) => {
-    const token = localStorage.getItem("crmToken"); if (!token) return setUserMessage("Please login again");
-    setUsersLoading(true); setUserMessage("");
-    try {
-      const params = new URLSearchParams(); if (typeFilter) params.append("userType", typeFilter); if (statusFilter) params.append("userStatus", statusFilter);
-      const response = await fetch(`${API_URL}/users${params.toString() ? `?${params}` : ""}`, { headers: { "Content-Type": "application/json", "x-access-token": token } });
-      const data = await response.json(); if (!response.ok) { setUsers([]); return setUserMessage(data.message || "Failed to load users"); }
-      const allUsers = Array.isArray(data) ? data : data.users || data.data || []; setUsers(allUsers); if (!allUsers.length) setUserMessage("No users found");
-    } catch { setUsers([]); setUserMessage("Cannot connect to backend"); }
-    finally { setUsersLoading(false); }
-  };
-
-  const handleCreateTicket = async (e) => {
-    e.preventDefault(); const token = localStorage.getItem("crmToken"); if (!token) return setTicketMessage("Please login again");
-    setTicketMessage("Creating ticket...");
-    try {
-      const response = await fetch(`${API_URL}/tickets`, { method: "POST", headers: { "Content-Type": "application/json", "x-access-token": token }, body: JSON.stringify({ title, description, ticketPriority: Number(ticketPriority), status: ticketStatus }) });
-      const data = await response.json(); if (!response.ok) return setTicketMessage(data.message || "Failed to create ticket");
-      setTitle(""); setDescription(""); setTicketPriority("3"); setTicketStatus("OPEN"); setTicketMessage("Ticket created successfully!"); await loadDashboard(); await loadTickets(); setActivePage("Tickets");
-    } catch { setTicketMessage("Cannot connect to backend"); }
-  };
-
-  const handleNavigation = (page) => { setActivePage(page); setTicketMessage(""); setUserMessage(""); if (page === "Dashboard") loadDashboard(); if (page === "Tickets") loadTickets(); if (page === "Users") loadUsers(); };
-  useEffect(() => { if (isLoggedIn) loadDashboard(); }, [isLoggedIn]);
-  const handleLogout = () => { localStorage.removeItem("crmToken"); localStorage.removeItem("crmUser"); setIsLoggedIn(false); setUser(null); };
-
-  if (!isLoggedIn) return <div className="login-page"><div className="login-card"><h1>EnterpriseFlow CRM</h1><p>Login to manage your support workspace</p><form onSubmit={handleLogin}><input type="text" placeholder="User ID" value={userId} onChange={e => setUserId(e.target.value)} required/><input type="password" placeholder="Password" value={password} onChange={e => setPassword(e.target.value)} required/><button type="submit">Login</button></form>{message && <p className="message">{message}</p>}<div className="demo-box"><h3>Demo Admin Credentials</h3><p>User ID: <b>admin</b></p><p>Password: <b>Welcome1</b></p></div></div></div>;
-
-  return <div><nav className="navbar"><h2>EnterpriseFlow CRM</h2><div><span>Welcome, {user?.name || "User"}</span><button onClick={handleLogout}>Logout</button></div></nav><div className="dashboard"><aside className="sidebar">{["Dashboard","Tickets","Create Ticket","Users"].map(page => <button key={page} className={activePage === page ? "active-nav" : ""} onClick={() => handleNavigation(page)}>{page === "Dashboard" ? "📊" : page === "Tickets" ? "🎫" : page === "Create Ticket" ? "➕" : "👥"} {page}</button>)}</aside><main className="main-content">
-  {activePage === "Dashboard" && <><div className="page-header"><div><h1>Dashboard</h1><p>Overview of your support operations.</p></div><button className="refresh-btn" onClick={loadDashboard}>Refresh Dashboard</button></div><div className="stats">{[["Total Tickets",dashboardData.totalTickets],["Open Tickets",dashboardData.openTickets],["In Progress",dashboardData.inProgressTickets],["Closed Tickets",dashboardData.closedTickets]].map(([label,value]) => <div className="stat-card" key={label}><h3>{label}</h3><p>{value}</p></div>)}</div></>}
-  {activePage === "Tickets" && <><div className="page-header"><div><h1>All Tickets</h1><p>View and manage support tickets.</p></div><button className="refresh-btn" onClick={loadTickets}>Refresh Tickets</button></div>{ticketMessage && <p className="message">{ticketMessage}</p>}{ticketsLoading ? <p>Loading tickets...</p> : tickets.length === 0 ? <div className="empty-state"><h3>No Tickets Found</h3><p>Create your first ticket.</p></div> : <div className="tickets-grid">{tickets.map(ticket => <div className="ticket-card" key={ticket._id}><h3>{ticket.title || "No Title"}</h3><p><b>Description:</b> {ticket.description || "No Description"}</p><p><b>Priority:</b> {ticket.ticketPriority || "N/A"}</p><p><b>Current Status:</b> <span className="status">{ticket.status || "OPEN"}</span></p><p><b>Reporter:</b> {ticket.reporter || "N/A"}</p>{ticket.assignee && <p><b>Assignee:</b> {ticket.assignee}</p>}<div className="update-status-section"><label><b>Update Status</b></label><select value={selectedStatuses[ticket._id] || ticket.status || "OPEN"} onChange={e => setSelectedStatuses(prev => ({...prev,[ticket._id]:e.target.value}))} disabled={updatingTicketId === ticket._id}><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option value="CLOSED">CLOSED</option></select><button className="update-status-btn" onClick={() => handleUpdateStatus(ticket)} disabled={updatingTicketId === ticket._id}>{updatingTicketId === ticket._id ? "Updating..." : "Update Status"}</button></div></div>)}</div>}</>}
-  {activePage === "Create Ticket" && <><h1>Create Ticket</h1><p>Create a new support ticket.</p><div className="ticket-form-container"><form className="ticket-form" onSubmit={handleCreateTicket}><label>Ticket Title</label><input value={title} onChange={e=>setTitle(e.target.value)} required/><label>Description</label><textarea value={description} onChange={e=>setDescription(e.target.value)} required/><label>Priority</label><select value={ticketPriority} onChange={e=>setTicketPriority(e.target.value)}>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n}</option>)}</select><label>Status</label><select value={ticketStatus} onChange={e=>setTicketStatus(e.target.value)}><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option value="CLOSED">CLOSED</option></select><button className="create-btn">Create Ticket</button></form>{ticketMessage && <p className="message">{ticketMessage}</p>}</div></>}
-  {activePage === "Users" && <><div className="page-header"><div><h1>Users Management</h1><p>View registered CRM users.</p></div><button className="refresh-btn" onClick={() => loadUsers()}>Refresh Users</button></div><div className="user-filters"><div><label>User Type</label><select value={userTypeFilter} onChange={e=>setUserTypeFilter(e.target.value)}><option value="">All User Types</option><option value="ADMIN">ADMIN</option><option value="CUSTOMER">CUSTOMER</option><option value="ENGINEER">ENGINEER</option></select></div><div><label>User Status</label><select value={userStatusFilter} onChange={e=>setUserStatusFilter(e.target.value)}><option value="">All Status</option><option value="APPROVED">APPROVED</option><option value="PENDING">PENDING</option><option value="BLOCKED">BLOCKED</option></select></div><div className="filter-buttons"><button className="filter-btn" onClick={() => loadUsers()}>Apply Filter</button><button className="clear-btn" onClick={() => {setUserTypeFilter("");setUserStatusFilter("");loadUsers("","");}}>Clear</button></div></div>{userMessage && <p className="message">{userMessage}</p>}{usersLoading ? <p>Loading users...</p> : <div className="users-table-container"><table className="users-table"><thead><tr><th>Name</th><th>User ID</th><th>Email</th><th>User Type</th><th>Status</th></tr></thead><tbody>{users.map(u=><tr key={u._id || u.userId}><td>{u.name || "N/A"}</td><td>{u.userId || "N/A"}</td><td>{u.email || "N/A"}</td><td>{u.userType || "N/A"}</td><td><span className="status">{u.userStatus || "N/A"}</span></td></tr>)}</tbody></table></div>}</>}
-</main></div></div>;
-}
-
+const API_URL=import.meta.env.VITE_API_URL||"http://localhost:7777/crm/api/v1";
+function App(){
+const[isLoggedIn,setIsLoggedIn]=useState(false),[user,setUser]=useState(null),[userId,setUserId]=useState("admin"),[password,setPassword]=useState("Welcome1"),[message,setMessage]=useState(""),[activePage,setActivePage]=useState("Dashboard"),[dashboardData,setDashboardData]=useState({totalTickets:0,openTickets:0,inProgressTickets:0,closedTickets:0}),[tickets,setTickets]=useState([]),[ticketsLoading,setTicketsLoading]=useState(false),[ticketMessage,setTicketMessage]=useState(""),[selectedStatuses,setSelectedStatuses]=useState({}),[updatingTicketId,setUpdatingTicketId]=useState(""),[title,setTitle]=useState(""),[description,setDescription]=useState(""),[ticketPriority,setTicketPriority]=useState("3"),[ticketStatus,setTicketStatus]=useState("OPEN"),[users,setUsers]=useState([]),[usersLoading,setUsersLoading]=useState(false),[userMessage,setUserMessage]=useState(""),[userTypeFilter,setUserTypeFilter]=useState(""),[userStatusFilter,setUserStatusFilter]=useState("");
+useEffect(()=>{const u=localStorage.getItem("crmUser"),t=localStorage.getItem("crmToken");if(u&&t)try{setUser(JSON.parse(u));setIsLoggedIn(true)}catch{localStorage.clear()}},[]);
+const handleLogin=async e=>{e.preventDefault();setMessage("Signing in securely...");try{const r=await fetch(`${API_URL}/auth/signin`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId,password})}),d=await r.json();if(!r.ok)return setMessage(d.message||"Login failed");const u={name:d.name||"User",userId:d.userId||userId,email:d.email||"",userStatus:d.userStatus||"",userType:d.userType||"",companyName:d.companyName||""};localStorage.setItem("crmToken",d.accessToken);localStorage.setItem("crmUser",JSON.stringify(u));setUser(u);setIsLoggedIn(true);setMessage("");setActivePage("Dashboard")}catch{setMessage("Cannot connect to backend server")}};
+const extractTickets=d=>Array.isArray(d)?d:Array.isArray(d?.tickets)?d.tickets:Array.isArray(d?.data)?d.data:[];
+const loadDashboard=async()=>{const t=localStorage.getItem("crmToken");if(!t)return;try{const r=await fetch(`${API_URL}/tickets`,{headers:{"x-access-token":t}}),d=await r.json();if(!r.ok)return;const a=extractTickets(d);setDashboardData({totalTickets:a.length,openTickets:a.filter(x=>x.status==="OPEN").length,inProgressTickets:a.filter(x=>x.status==="IN_PROGRESS").length,closedTickets:a.filter(x=>x.status==="CLOSED").length})}catch{}};
+const loadTickets=async()=>{const t=localStorage.getItem("crmToken");setTicketsLoading(true);try{const r=await fetch(`${API_URL}/tickets`,{headers:{"x-access-token":t}}),d=await r.json();if(!r.ok){setTickets([]);return setTicketMessage(d.message||"Failed to load tickets")}const a=extractTickets(d);setTickets(a);const m={};a.forEach(x=>m[x._id]=x.status||"OPEN");setSelectedStatuses(m);setTicketMessage(a.length?"":"No tickets found")}catch{setTicketMessage("Cannot connect to backend")}finally{setTicketsLoading(false)}};
+const handleUpdateStatus=async ticket=>{const t=localStorage.getItem("crmToken"),s=selectedStatuses[ticket._id]||ticket.status;if(s===ticket.status)return;setUpdatingTicketId(ticket._id);try{const r=await fetch(`${API_URL}/tickets/${ticket._id}`,{method:"PUT",headers:{"Content-Type":"application/json","x-access-token":t},body:JSON.stringify({status:s})}),d=await r.json();if(!r.ok)return setTicketMessage(d.message||"Update failed");setTicketMessage("Ticket updated successfully");await loadDashboard();await loadTickets()}catch{setTicketMessage("Update failed")}finally{setUpdatingTicketId("")}};
+const loadUsers=async(type=userTypeFilter,status=userStatusFilter)=>{const t=localStorage.getItem("crmToken");setUsersLoading(true);try{const p=new URLSearchParams();if(type)p.append("userType",type);if(status)p.append("userStatus",status);const r=await fetch(`${API_URL}/users${p.toString()?`?${p}`:""}`,{headers:{"x-access-token":t}}),d=await r.json();if(!r.ok){setUsers([]);return setUserMessage(d.message||"Failed to load users")}const a=Array.isArray(d)?d:d.users||d.data||[];setUsers(a);setUserMessage(a.length?"":"No users found")}catch{setUserMessage("Cannot connect to backend")}finally{setUsersLoading(false)}};
+const handleCreateTicket=async e=>{e.preventDefault();const t=localStorage.getItem("crmToken");setTicketMessage("Creating ticket...");try{const r=await fetch(`${API_URL}/tickets`,{method:"POST",headers:{"Content-Type":"application/json","x-access-token":t},body:JSON.stringify({title,description,ticketPriority:Number(ticketPriority),status:ticketStatus})}),d=await r.json();if(!r.ok)return setTicketMessage(d.message||"Failed to create ticket");setTitle("");setDescription("");setTicketMessage("Ticket created successfully");await loadDashboard();await loadTickets();setActivePage("Tickets")}catch{setTicketMessage("Cannot connect to backend")}};
+const nav=p=>{setActivePage(p);setTicketMessage("");setUserMessage("");if(p==="Dashboard")loadDashboard();if(p==="Tickets")loadTickets();if(p==="Users")loadUsers()};useEffect(()=>{if(isLoggedIn)loadDashboard()},[isLoggedIn]);const logout=()=>{localStorage.removeItem("crmToken");localStorage.removeItem("crmUser");setIsLoggedIn(false);setUser(null)};
+if(!isLoggedIn)return <div className="auth-shell"><section className="auth-hero"><div className="brand"><span className="brand-mark">EF</span><div><strong>EnterpriseFlow</strong><small>CRM & Service Desk</small></div></div><div className="hero-copy"><span className="eyebrow">SMARTER SUPPORT</span><h1>Powering Better <em>Business</em></h1><p>A unified workspace to manage customers, resolve issues and deliver exceptional support.</p><div className="feature-list"><div><b>◎</b><span><strong>Ticket Management</strong><small>Track and resolve efficiently</small></span></div><div><b>◇</b><span><strong>Team Collaboration</strong><small>Work together seamlessly</small></span></div><div><b>⌾</b><span><strong>Data Security</strong><small>Role-based secure access</small></span></div><div><b>↗</b><span><strong>Insightful Analytics</strong><small>Make better decisions</small></span></div></div></div><div className="hero-visual"><div className="orbit orbit-one"></div><div className="orbit orbit-two"></div><div className="core-user">♟</div><span className="node n1">✓</span><span className="node n2">⚙</span><span className="node n3">▤</span></div></section><section className="auth-panel"><div className="security-line">Secure&nbsp;&nbsp;•&nbsp;&nbsp;Scalable&nbsp;&nbsp;•&nbsp;&nbsp;Reliable</div><div className="login-box"><div className="secure-badge">♢ Protected & Secure</div><h2>Welcome Back</h2><p>Sign in to your EnterpriseFlow workspace</p><form onSubmit={handleLogin}><label>User ID</label><input value={userId} onChange={e=>setUserId(e.target.value)} placeholder="Enter your user ID" required/><label>Password</label><input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter your password" required/><div className="login-options"><label><input type="checkbox"/> Remember me</label><span>Secure access</span></div><button>Sign In <span>→</span></button></form>{message&&<div className="auth-message">{message}</div>}<div className="demo-box"><h3>Interview Demo Access</h3><p>User ID: <b>admin</b> &nbsp;•&nbsp; Password: <b>Welcome1</b></p></div><div className="trust-note">🔒 Enterprise-grade role based authentication</div></div></section></div>;
+return <div><nav className="navbar"><h2>EnterpriseFlow CRM</h2><div><span>{user?.companyName||"Enterprise Workspace"} · {user?.name||"User"}</span><button onClick={logout}>Logout</button></div></nav><div className="dashboard"><aside className="sidebar">{["Dashboard","Tickets","Create Ticket","Users"].map(p=><button key={p} className={activePage===p?"active-nav":""} onClick={()=>nav(p)}>{p==="Dashboard"?"▦":p==="Tickets"?"▤":p==="Create Ticket"?"＋":"♙"} {p}</button>)}</aside><main className="main-content">{activePage==="Dashboard"&&<><div className="page-header"><div><h1>Operations Dashboard</h1><p>Real-time overview of your service workspace.</p></div><button className="refresh-btn" onClick={loadDashboard}>Refresh</button></div><div className="stats">{[["Total Tickets",dashboardData.totalTickets],["Open Tickets",dashboardData.openTickets],["In Progress",dashboardData.inProgressTickets],["Resolved",dashboardData.closedTickets]].map(([l,v])=><div className="stat-card" key={l}><h3>{l}</h3><p>{v}</p></div>)}</div></>}{activePage==="Tickets"&&<><div className="page-header"><div><h1>Support Tickets</h1><p>Monitor and manage customer requests.</p></div><button className="refresh-btn" onClick={loadTickets}>Refresh</button></div>{ticketMessage&&<p className="message">{ticketMessage}</p>}{ticketsLoading?<p>Loading tickets...</p>:tickets.length===0?<div className="empty-state"><h3>No tickets yet</h3><p>Create a support request to get started.</p></div>:<div className="tickets-grid">{tickets.map(x=><div className="ticket-card" key={x._id}><h3>{x.title}</h3><p>{x.description}</p><p><b>Priority:</b> {x.ticketPriority}</p><p><b>Status:</b> <span className="status">{x.status}</span></p><p><b>Reporter:</b> {x.reporter}</p>{x.assignee&&<p><b>Assignee:</b> {x.assignee}</p>}<div className="update-status-section"><select value={selectedStatuses[x._id]||x.status} onChange={e=>setSelectedStatuses(p=>({...p,[x._id]:e.target.value}))}><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option value="CLOSED">CLOSED</option></select><button className="update-status-btn" onClick={()=>handleUpdateStatus(x)} disabled={updatingTicketId===x._id}>{updatingTicketId===x._id?"Updating...":"Update Status"}</button></div></div>)}</div>}</>}{activePage==="Create Ticket"&&<><h1>Create Support Ticket</h1><p>Submit a new customer or internal support request.</p><div className="ticket-form-container"><form className="ticket-form" onSubmit={handleCreateTicket}><label>Ticket title</label><input value={title} onChange={e=>setTitle(e.target.value)} required/><label>Description</label><textarea value={description} onChange={e=>setDescription(e.target.value)} required/><label>Priority</label><select value={ticketPriority} onChange={e=>setTicketPriority(e.target.value)}>{[1,2,3,4,5].map(n=><option key={n}>{n}</option>)}</select><label>Status</label><select value={ticketStatus} onChange={e=>setTicketStatus(e.target.value)}><option>OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option>CLOSED</option></select><button className="create-btn">Create Ticket</button></form>{ticketMessage&&<p className="message">{ticketMessage}</p>}</div></>}{activePage==="Users"&&<><div className="page-header"><div><h1>User Management</h1><p>Manage workspace customers, engineers and administrators.</p></div><button className="refresh-btn" onClick={()=>loadUsers()}>Refresh</button></div><div className="user-filters"><div><label>Role</label><select value={userTypeFilter} onChange={e=>setUserTypeFilter(e.target.value)}><option value="">All Roles</option><option>ADMIN</option><option>CUSTOMER</option><option>ENGINEER</option></select></div><div><label>Status</label><select value={userStatusFilter} onChange={e=>setUserStatusFilter(e.target.value)}><option value="">All Status</option><option>APPROVED</option><option>PENDING</option><option>BLOCKED</option></select></div><div className="filter-buttons"><button className="filter-btn" onClick={()=>loadUsers()}>Apply</button><button className="clear-btn" onClick={()=>{setUserTypeFilter("");setUserStatusFilter("");loadUsers("","")}}>Clear</button></div></div>{userMessage&&<p className="message">{userMessage}</p>}{usersLoading?<p>Loading users...</p>:<div className="users-table-container"><table className="users-table"><thead><tr><th>Name</th><th>User ID</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>{users.map(u=><tr key={u._id||u.userId}><td>{u.name}</td><td>{u.userId}</td><td>{u.email}</td><td>{u.userType}</td><td><span className="status">{u.userStatus}</span></td></tr>)}</tbody></table></div>}</>}</main></div></div>}
 export default App;
