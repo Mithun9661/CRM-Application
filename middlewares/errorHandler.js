@@ -1,10 +1,21 @@
 module.exports = (err, req, res, next) => {
+    const statusCode =
+        err.statusCode ||
+        err.status ||
+        (err.name === "ValidationError" || err.name === "CastError" ? 400 : 500);
 
-    console.error(err);
+    const safeStatus = err.code === 11000 ? 409 : statusCode;
+    const isServerError = safeStatus >= 500;
 
-    res.status(500).json({
+    console.error(`[${req.method} ${req.originalUrl}]`, err.message || err);
+
+    return res.status(safeStatus).json({
         success: false,
-        message: err.message || "Internal Server Error"
+        message:
+            err.code === 11000
+                ? "A record with the same unique value already exists"
+                : isServerError && process.env.NODE_ENV === "production"
+                    ? "Internal Server Error"
+                    : err.message || "Internal Server Error"
     });
-
 };
