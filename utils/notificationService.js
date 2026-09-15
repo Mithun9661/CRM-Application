@@ -1,4 +1,68 @@
 const Notification = require("../Models/notification.model");
+const User = require("../Models/user.model");
+const transporter = require("../configs/mailer");
+
+const emailConfigured = Boolean(process.env.EMAIL_USER && process.env.EMAIL_PASS);
+
+if (emailConfigured) {
+  console.log("[email] Direct CRM email notifications enabled");
+} else {
+  console.warn("[email] EMAIL_USER/EMAIL_PASS not configured - email notifications disabled");
+}
+
+const escapeHtml = (value = "") => String(value)
+  .replace(/&/g, "&amp;")
+  .replace(/</g, "&lt;")
+  .replace(/>/g, "&gt;")
+  .replace(/\"/g, "&quot;")
+  .replace(/'/g, "&#039;");
+
+const sendEmailNotifications = async ({ recipients, title, message, ticketId }) => {
+  if (!emailConfigured || !transporter) return;
+
+  const users = await User.find({
+    userId: { $in: recipients },
+    email: { $exists: true, $ne: "" }
+  }).select("userId name email");
+
+  if (!users.length) return;
+
+  const frontendUrl = String(
+    process.env.CRM_FRONTEND_URL || "https://crm-application-vert.vercel.app"
+  ).replace(/\/$/, "");
+
+  const safeTitle = escapeHtml(title);
+  const safeMessage = escapeHtml(message);
+  const ticketReference = ticketId ? escapeHtml(String(ticketId)) : "";
+
+  const results = await Promise.allSettled(
+    users.map((user) => transporter.sendMail({
+      from: process.env.EMAIL_FROM || process.env.EMAIL_USER,
+      to: user.email,
+      subject: `[EnterpriseFlow CRM] ${title}`,
+      text: `${title}\n\n${message}${ticketId ? `\n\nTicket ID: ${ticketId}` : ""}\n\nOpen CRM: ${frontendUrl}`,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:620px;margin:auto;color:#172033">
+          <h2 style="margin-bottom:8px">${safeTitle}</h2>
+          <p style="line-height:1.6">${safeMessage}</p>
+          ${ticketReference ? `<p><strong>Ticket ID:</strong> ${ticketReference}</p>` : ""}
+          <p style="margin-top:24px">
+            <a href="${frontendUrl}" style="display:inline-block;padding:11px 18px;background:#5b5df0;color:white;text-decoration:none;border-radius:8px">Open EnterpriseFlow CRM</a>
+          </p>
+          <p style="margin-top:28px;font-size:12px;color:#667085">This is an automated CRM notification.</p>
+        </div>
+      `
+    }))
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error(`[email] Failed for ${users[index].userId}:`, result.reason?.message || result.reason);
+    } else {
+      console.log(`[email] Notification sent to ${users[index].userId}`);
+    }
+  });
+};
 
 const notifyUsers = async ({ recipients, companyId = null, ticketId = null, type, title, message, createdBy = "SYSTEM" }) => {
   try {
@@ -17,6 +81,18 @@ const notifyUsers = async ({ recipients, companyId = null, ticketId = null, type
       })),
       { ordered: false }
     );
+
+    try {
+      await sendEmailNotifications({
+        recipients: uniqueRecipients,
+        title,
+        message,
+        ticketId
+      });
+    } catch (emailError) {
+      // Email delivery must never break ticket/comment workflows.
+      console.error("Email notification failed:", emailError.message);
+    }
   } catch (err) {
     // Notifications must never break the main CRM workflow.
     console.error("Notification creation failed:", err.message);
