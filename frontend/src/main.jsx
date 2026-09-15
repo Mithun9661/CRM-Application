@@ -1,5 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+// Load session recovery before the React application starts.
 import './auth-session.js'
 import './index.css'
 import App from './App.jsx'
