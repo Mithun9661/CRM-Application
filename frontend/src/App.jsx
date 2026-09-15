@@ -1,17 +1,494 @@
 import "./App.css";
 import { useEffect, useState } from "react";
-const API_URL=import.meta.env.VITE_API_URL||"http://localhost:7777/crm/api/v1";
-function App(){
-const[isLoggedIn,setIsLoggedIn]=useState(false),[user,setUser]=useState(null),[userId,setUserId]=useState("admin"),[password,setPassword]=useState("Welcome1"),[showPassword,setShowPassword]=useState(false),[message,setMessage]=useState(""),[activePage,setActivePage]=useState("Dashboard"),[dashboardData,setDashboardData]=useState({totalTickets:0,openTickets:0,inProgressTickets:0,closedTickets:0}),[tickets,setTickets]=useState([]),[ticketsLoading,setTicketsLoading]=useState(false),[ticketMessage,setTicketMessage]=useState(""),[selectedStatuses,setSelectedStatuses]=useState({}),[updatingTicketId,setUpdatingTicketId]=useState(""),[title,setTitle]=useState(""),[description,setDescription]=useState(""),[ticketPriority,setTicketPriority]=useState("3"),[ticketStatus,setTicketStatus]=useState("OPEN"),[users,setUsers]=useState([]),[usersLoading,setUsersLoading]=useState(false),[userMessage,setUserMessage]=useState(""),[userTypeFilter,setUserTypeFilter]=useState(""),[userStatusFilter,setUserStatusFilter]=useState("");
-useEffect(()=>{const u=localStorage.getItem("crmUser"),t=localStorage.getItem("crmToken");if(u&&t)try{setUser(JSON.parse(u));setIsLoggedIn(true)}catch{localStorage.clear()}},[]);
-const handleLogin=async e=>{e.preventDefault();setMessage("Signing in...");try{const r=await fetch(`${API_URL}/auth/signin`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({userId,password})}),d=await r.json();if(!r.ok)return setMessage(d.message||"Login failed");const u={name:d.name||"User",userId:d.userId||userId,email:d.email||"",userStatus:d.userStatus||"",userType:d.userType||"",companyName:d.companyName||""};localStorage.setItem("crmToken",d.accessToken);localStorage.setItem("crmUser",JSON.stringify(u));setUser(u);setIsLoggedIn(true);setMessage("");setActivePage("Dashboard")}catch{setMessage("Cannot connect to backend server")}};
-const extractTickets=d=>Array.isArray(d)?d:Array.isArray(d?.tickets)?d.tickets:Array.isArray(d?.data)?d.data:[];
-const loadDashboard=async()=>{const t=localStorage.getItem("crmToken");if(!t)return;try{const r=await fetch(`${API_URL}/tickets`,{headers:{"x-access-token":t}}),d=await r.json();if(!r.ok)return;const a=extractTickets(d);setDashboardData({totalTickets:a.length,openTickets:a.filter(x=>x.status==="OPEN").length,inProgressTickets:a.filter(x=>x.status==="IN_PROGRESS").length,closedTickets:a.filter(x=>x.status==="CLOSED").length})}catch{}};
-const loadTickets=async()=>{const t=localStorage.getItem("crmToken");setTicketsLoading(true);try{const r=await fetch(`${API_URL}/tickets`,{headers:{"x-access-token":t}}),d=await r.json();if(!r.ok){setTickets([]);return setTicketMessage(d.message||"Failed to load tickets")}const a=extractTickets(d);setTickets(a);const m={};a.forEach(x=>m[x._id]=x.status||"OPEN");setSelectedStatuses(m);setTicketMessage(a.length?"":"No tickets found")}catch{setTicketMessage("Cannot connect to backend")}finally{setTicketsLoading(false)}};
-const handleUpdateStatus=async ticket=>{const t=localStorage.getItem("crmToken"),s=selectedStatuses[ticket._id]||ticket.status;if(s===ticket.status)return;setUpdatingTicketId(ticket._id);try{const r=await fetch(`${API_URL}/tickets/${ticket._id}`,{method:"PUT",headers:{"Content-Type":"application/json","x-access-token":t},body:JSON.stringify({status:s})}),d=await r.json();if(!r.ok)return setTicketMessage(d.message||"Update failed");setTicketMessage("Ticket updated successfully");await loadDashboard();await loadTickets()}catch{setTicketMessage("Update failed")}finally{setUpdatingTicketId("")}};
-const loadUsers=async(type=userTypeFilter,status=userStatusFilter)=>{const t=localStorage.getItem("crmToken");setUsersLoading(true);try{const p=new URLSearchParams();if(type)p.append("userType",type);if(status)p.append("userStatus",status);const r=await fetch(`${API_URL}/users${p.toString()?`?${p}`:""}`,{headers:{"x-access-token":t}}),d=await r.json();if(!r.ok){setUsers([]);return setUserMessage(d.message||"Failed to load users")}const a=Array.isArray(d)?d:d.users||d.data||[];setUsers(a);setUserMessage(a.length?"":"No users found")}catch{setUserMessage("Cannot connect to backend")}finally{setUsersLoading(false)}};
-const handleCreateTicket=async e=>{e.preventDefault();const t=localStorage.getItem("crmToken");setTicketMessage("Creating ticket...");try{const r=await fetch(`${API_URL}/tickets`,{method:"POST",headers:{"Content-Type":"application/json","x-access-token":t},body:JSON.stringify({title,description,ticketPriority:Number(ticketPriority),status:ticketStatus})}),d=await r.json();if(!r.ok)return setTicketMessage(d.message||"Failed to create ticket");setTitle("");setDescription("");setTicketMessage("Ticket created successfully");await loadDashboard();await loadTickets();setActivePage("Tickets")}catch{setTicketMessage("Cannot connect to backend")}};
-const nav=p=>{setActivePage(p);setTicketMessage("");setUserMessage("");if(p==="Dashboard")loadDashboard();if(p==="Tickets")loadTickets();if(p==="Users")loadUsers()};useEffect(()=>{if(isLoggedIn)loadDashboard()},[isLoggedIn]);const logout=()=>{localStorage.removeItem("crmToken");localStorage.removeItem("crmUser");setIsLoggedIn(false);setUser(null)};
-if(!isLoggedIn)return <div className="reference-login"><header className="ref-header"><div className="ref-brand"><span className="ref-logo"><i></i><i></i><i></i></span><div><strong>CRM Application</strong><small>Manage • Support • Grow</small></div></div><div className="ref-security">Secure <b>|</b> Scalable <b>|</b> Reliable <span></span></div></header><main className="ref-main"><section className="ref-hero"><div className="ref-copy"><div className="ref-eyebrow">SMARTER SUPPORT</div><h1>Powering<br/>Better <em>Business</em></h1><p>A unified platform to manage customers,<br/>track issues, and deliver exceptional support.</p><div className="ref-features"><div><b>▣</b><span><strong>Ticket Management</strong><small>Track and resolve efficiently</small></span></div><div><b>♙</b><span><strong>Team Collaboration</strong><small>Work together seamlessly</small></span></div><div><b>◇</b><span><strong>Data Security</strong><small>Your data stays protected</small></span></div><div><b>▥</b><span><strong>Insightful Analytics</strong><small>Make better decisions</small></span></div></div></div><div className="ref-person"><div className="world-grid"></div><div className="person-silhouette"><span className="head"></span><span className="body"></span></div><div className="hud-ring r1"></div><div className="hud-ring r2"></div><span className="hud h1">♟</span><span className="hud h2">⚙</span><span className="hud h3">↗</span><span className="hud h4">▤</span><div className="finger-glow"></div><blockquote>“Secure Systems<br/>Stronger Businesses”</blockquote></div></section><section className="ref-auth"><div className="ref-card"><div className="protected">♢ <span>Protected<br/>& Secure</span></div><h2>Welcome Back</h2><p>Sign in to your CRM account</p><form onSubmit={handleLogin}><label>Username / Email</label><div className="field"><span>♙</span><input value={userId} onChange={e=>setUserId(e.target.value)} placeholder="Enter your username or email" required/></div><label>Password</label><div className="field"><span>♢</span><input type={showPassword?"text":"password"} value={password} onChange={e=>setPassword(e.target.value)} placeholder="Enter your password" required/><button type="button" className="eye" onClick={()=>setShowPassword(!showPassword)}>{showPassword?"◉":"◎"}</button></div><div className="ref-options"><label><input type="checkbox"/> Remember me</label><button type="button">Forgot password?</button></div><button className="ref-signin">Sign In <span>→</span></button></form>{message&&<div className="auth-message">{message}</div>}<div className="or"><span></span>OR<span></span></div><div className="social-row"><button><b className="google">G</b> Continue with Google</button><button><b className="microsoft">⊞</b> Continue with Microsoft</button></div><div className="new-crm">New to CRM? <span>Contact your administrator</span></div></div></section></main><footer className="ref-footer"><div><span className="mini-logo">▥</span> CRM Application <small>© 2026. All rights reserved.</small></div><div>Privacy&nbsp;&nbsp; | &nbsp;&nbsp;Terms&nbsp;&nbsp; | &nbsp;&nbsp;Support</div><div><i></i> All Systems Operational</div></footer></div>;
-return <div><nav className="navbar"><h2>EnterpriseFlow CRM</h2><div><span>{user?.companyName||"Enterprise Workspace"} · {user?.name||"User"}</span><button onClick={logout}>Logout</button></div></nav><div className="dashboard"><aside className="sidebar">{["Dashboard","Tickets","Create Ticket","Users"].map(p=><button key={p} className={activePage===p?"active-nav":""} onClick={()=>nav(p)}>{p==="Dashboard"?"▦":p==="Tickets"?"▤":p==="Create Ticket"?"＋":"♙"} {p}</button>)}</aside><main className="main-content">{activePage==="Dashboard"&&<><div className="page-header"><div><h1>Operations Dashboard</h1><p>Real-time overview of your service workspace.</p></div><button className="refresh-btn" onClick={loadDashboard}>Refresh</button></div><div className="stats">{[["Total Tickets",dashboardData.totalTickets],["Open Tickets",dashboardData.openTickets],["In Progress",dashboardData.inProgressTickets],["Resolved",dashboardData.closedTickets]].map(([l,v])=><div className="stat-card" key={l}><h3>{l}</h3><p>{v}</p></div>)}</div></>}{activePage==="Tickets"&&<><div className="page-header"><div><h1>Support Tickets</h1><p>Monitor and manage customer requests.</p></div><button className="refresh-btn" onClick={loadTickets}>Refresh</button></div>{ticketMessage&&<p className="message">{ticketMessage}</p>}{ticketsLoading?<p>Loading tickets...</p>:tickets.length===0?<div className="empty-state"><h3>No tickets yet</h3><p>Create a support request to get started.</p></div>:<div className="tickets-grid">{tickets.map(x=><div className="ticket-card" key={x._id}><h3>{x.title}</h3><p>{x.description}</p><p><b>Priority:</b> {x.ticketPriority}</p><p><b>Status:</b> <span className="status">{x.status}</span></p><p><b>Reporter:</b> {x.reporter}</p>{x.assignee&&<p><b>Assignee:</b> {x.assignee}</p>}<div className="update-status-section"><select value={selectedStatuses[x._id]||x.status} onChange={e=>setSelectedStatuses(p=>({...p,[x._id]:e.target.value}))}><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option value="CLOSED">CLOSED</option></select><button className="update-status-btn" onClick={()=>handleUpdateStatus(x)} disabled={updatingTicketId===x._id}>{updatingTicketId===x._id?"Updating...":"Update Status"}</button></div></div>)}</div>}</>}{activePage==="Create Ticket"&&<><h1>Create Support Ticket</h1><p>Submit a new customer or internal support request.</p><div className="ticket-form-container"><form className="ticket-form" onSubmit={handleCreateTicket}><label>Ticket title</label><input value={title} onChange={e=>setTitle(e.target.value)} required/><label>Description</label><textarea value={description} onChange={e=>setDescription(e.target.value)} required/><label>Priority</label><select value={ticketPriority} onChange={e=>setTicketPriority(e.target.value)}>{[1,2,3,4,5].map(n=><option key={n}>{n}</option>)}</select><label>Status</label><select value={ticketStatus} onChange={e=>setTicketStatus(e.target.value)}><option>OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option>CLOSED</option></select><button className="create-btn">Create Ticket</button></form>{ticketMessage&&<p className="message">{ticketMessage}</p>}</div></>}{activePage==="Users"&&<><div className="page-header"><div><h1>User Management</h1><p>Manage workspace customers, engineers and administrators.</p></div><button className="refresh-btn" onClick={()=>loadUsers()}>Refresh</button></div><div className="user-filters"><div><label>Role</label><select value={userTypeFilter} onChange={e=>setUserTypeFilter(e.target.value)}><option value="">All Roles</option><option>ADMIN</option><option>CUSTOMER</option><option>ENGINEER</option></select></div><div><label>Status</label><select value={userStatusFilter} onChange={e=>setUserStatusFilter(e.target.value)}><option value="">All Status</option><option>APPROVED</option><option>PENDING</option><option>BLOCKED</option></select></div><div className="filter-buttons"><button className="filter-btn" onClick={()=>loadUsers()}>Apply</button><button className="clear-btn" onClick={()=>{setUserTypeFilter("");setUserStatusFilter("");loadUsers("","")}}>Clear</button></div></div>{userMessage&&<p className="message">{userMessage}</p>}{usersLoading?<p>Loading users...</p>:<div className="users-table-container"><table className="users-table"><thead><tr><th>Name</th><th>User ID</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>{users.map(u=><tr key={u._id||u.userId}><td>{u.name}</td><td>{u.userId}</td><td>{u.email}</td><td>{u.userType}</td><td><span className="status">{u.userStatus}</span></td></tr>)}</tbody></table></div>}</>}</main></div></div>}
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7777/crm/api/v1";
+
+const emptyDashboard = {
+  totalTickets: 0,
+  openTickets: 0,
+  inProgressTickets: 0,
+  closedTickets: 0,
+  highPriorityTickets: 0,
+  totalUsers: 0,
+  customers: 0,
+  engineers: 0,
+  admins: 0,
+  priorityBreakdown: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  recentTickets: [],
+  scope: ""
+};
+
+function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [user, setUser] = useState(null);
+  const [userId, setUserId] = useState("admin");
+  const [password, setPassword] = useState("Welcome1");
+  const [showPassword, setShowPassword] = useState(false);
+  const [message, setMessage] = useState("");
+  const [activePage, setActivePage] = useState("Dashboard");
+
+  const [dashboardData, setDashboardData] = useState(emptyDashboard);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
+  const [dashboardMessage, setDashboardMessage] = useState("");
+
+  const [tickets, setTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketMessage, setTicketMessage] = useState("");
+  const [selectedStatuses, setSelectedStatuses] = useState({});
+  const [updatingTicketId, setUpdatingTicketId] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [ticketPriority, setTicketPriority] = useState("3");
+  const [ticketStatus, setTicketStatus] = useState("OPEN");
+
+  const [users, setUsers] = useState([]);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [userMessage, setUserMessage] = useState("");
+  const [userTypeFilter, setUserTypeFilter] = useState("");
+  const [userStatusFilter, setUserStatusFilter] = useState("");
+
+  useEffect(() => {
+    const savedUser = localStorage.getItem("crmUser");
+    const token = localStorage.getItem("crmToken");
+    if (savedUser && token) {
+      try {
+        setUser(JSON.parse(savedUser));
+        setIsLoggedIn(true);
+      } catch {
+        localStorage.clear();
+      }
+    }
+  }, []);
+
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setMessage("Signing in...");
+    try {
+      const response = await fetch(`${API_URL}/auth/signin`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, password })
+      });
+      const data = await response.json();
+      if (!response.ok) return setMessage(data.message || "Login failed");
+
+      const loggedInUser = {
+        name: data.name || "User",
+        userId: data.userId || userId,
+        email: data.email || "",
+        userStatus: data.userStatus || "",
+        userType: data.userType || "",
+        companyName: data.companyName || ""
+      };
+
+      localStorage.setItem("crmToken", data.accessToken);
+      localStorage.setItem("crmUser", JSON.stringify(loggedInUser));
+      setUser(loggedInUser);
+      setIsLoggedIn(true);
+      setMessage("");
+      setActivePage("Dashboard");
+    } catch {
+      setMessage("Cannot connect to backend server");
+    }
+  };
+
+  const extractTickets = (data) =>
+    Array.isArray(data)
+      ? data
+      : Array.isArray(data?.tickets)
+        ? data.tickets
+        : Array.isArray(data?.data)
+          ? data.data
+          : [];
+
+  const loadDashboard = async () => {
+    const token = localStorage.getItem("crmToken");
+    if (!token) return;
+
+    setDashboardLoading(true);
+    setDashboardMessage("");
+    try {
+      const response = await fetch(`${API_URL}/dashboard`, {
+        headers: { "x-access-token": token }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setDashboardMessage(data.message || "Unable to load dashboard");
+        return;
+      }
+
+      const stats = data.stats || {};
+      setDashboardData({
+        totalTickets: stats.totalTickets || 0,
+        openTickets: stats.openTickets || 0,
+        inProgressTickets: stats.inProgressTickets || 0,
+        closedTickets: stats.closedTickets || 0,
+        highPriorityTickets: stats.highPriorityTickets || 0,
+        totalUsers: stats.totalUsers || 0,
+        customers: stats.customers || 0,
+        engineers: stats.engineers || 0,
+        admins: stats.admins || 0,
+        priorityBreakdown: data.priorityBreakdown || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+        recentTickets: Array.isArray(data.recentTickets) ? data.recentTickets : [],
+        scope: data.scope || ""
+      });
+    } catch {
+      setDashboardMessage("Cannot connect to dashboard service");
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+  const loadTickets = async () => {
+    const token = localStorage.getItem("crmToken");
+    setTicketsLoading(true);
+    try {
+      const response = await fetch(`${API_URL}/tickets`, {
+        headers: { "x-access-token": token }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setTickets([]);
+        return setTicketMessage(data.message || "Failed to load tickets");
+      }
+      const list = extractTickets(data);
+      setTickets(list);
+      const selected = {};
+      list.forEach((ticket) => {
+        selected[ticket._id] = ticket.status || "OPEN";
+      });
+      setSelectedStatuses(selected);
+      setTicketMessage(list.length ? "" : "No tickets found");
+    } catch {
+      setTicketMessage("Cannot connect to backend");
+    } finally {
+      setTicketsLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (ticket) => {
+    const token = localStorage.getItem("crmToken");
+    const status = selectedStatuses[ticket._id] || ticket.status;
+    if (status === ticket.status) return;
+
+    setUpdatingTicketId(ticket._id);
+    try {
+      const response = await fetch(`${API_URL}/tickets/${ticket._id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-token": token
+        },
+        body: JSON.stringify({ status })
+      });
+      const data = await response.json();
+      if (!response.ok) return setTicketMessage(data.message || "Update failed");
+      setTicketMessage("Ticket updated successfully");
+      await loadDashboard();
+      await loadTickets();
+    } catch {
+      setTicketMessage("Update failed");
+    } finally {
+      setUpdatingTicketId("");
+    }
+  };
+
+  const loadUsers = async (type = userTypeFilter, status = userStatusFilter) => {
+    const token = localStorage.getItem("crmToken");
+    setUsersLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (type) params.append("userType", type);
+      if (status) params.append("userStatus", status);
+
+      const response = await fetch(`${API_URL}/users${params.toString() ? `?${params}` : ""}`, {
+        headers: { "x-access-token": token }
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setUsers([]);
+        return setUserMessage(data.message || "Failed to load users");
+      }
+      const list = Array.isArray(data) ? data : data.users || data.data || [];
+      setUsers(list);
+      setUserMessage(list.length ? "" : "No users found");
+    } catch {
+      setUserMessage("Cannot connect to backend");
+    } finally {
+      setUsersLoading(false);
+    }
+  };
+
+  const handleCreateTicket = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem("crmToken");
+    setTicketMessage("Creating ticket...");
+    try {
+      const response = await fetch(`${API_URL}/tickets`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-access-token": token
+        },
+        body: JSON.stringify({
+          title,
+          description,
+          ticketPriority: Number(ticketPriority),
+          status: ticketStatus
+        })
+      });
+      const data = await response.json();
+      if (!response.ok) return setTicketMessage(data.message || "Failed to create ticket");
+
+      setTitle("");
+      setDescription("");
+      setTicketMessage("Ticket created successfully");
+      await loadDashboard();
+      await loadTickets();
+      setActivePage("Tickets");
+    } catch {
+      setTicketMessage("Cannot connect to backend");
+    }
+  };
+
+  const nav = (page) => {
+    setActivePage(page);
+    setTicketMessage("");
+    setUserMessage("");
+    if (page === "Dashboard") loadDashboard();
+    if (page === "Tickets") loadTickets();
+    if (page === "Users") loadUsers();
+  };
+
+  useEffect(() => {
+    if (isLoggedIn) loadDashboard();
+  }, [isLoggedIn]);
+
+  const logout = () => {
+    localStorage.removeItem("crmToken");
+    localStorage.removeItem("crmUser");
+    setIsLoggedIn(false);
+    setUser(null);
+  };
+
+  const formatDate = (value) => {
+    if (!value) return "—";
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? "—" : date.toLocaleDateString();
+  };
+
+  const priorityTotal = Object.values(dashboardData.priorityBreakdown || {}).reduce(
+    (sum, value) => sum + Number(value || 0),
+    0
+  );
+
+  if (!isLoggedIn) {
+    return (
+      <div className="reference-login">
+        <header className="ref-header">
+          <div className="ref-brand">
+            <span className="ref-logo"><i></i><i></i><i></i></span>
+            <div><strong>CRM Application</strong><small>Manage • Support • Grow</small></div>
+          </div>
+          <div className="ref-security">Secure <b>|</b> Scalable <b>|</b> Reliable <span></span></div>
+        </header>
+        <main className="ref-main">
+          <section className="ref-hero">
+            <div className="ref-copy">
+              <div className="ref-eyebrow">SMARTER SUPPORT</div>
+              <h1>Powering<br />Better <em>Business</em></h1>
+              <p>A unified platform to manage customers,<br />track issues, and deliver exceptional support.</p>
+              <div className="ref-features">
+                <div><b>▣</b><span><strong>Ticket Management</strong><small>Track and resolve efficiently</small></span></div>
+                <div><b>♙</b><span><strong>Team Collaboration</strong><small>Work together seamlessly</small></span></div>
+                <div><b>◇</b><span><strong>Data Security</strong><small>Your data stays protected</small></span></div>
+                <div><b>▥</b><span><strong>Insightful Analytics</strong><small>Make better decisions</small></span></div>
+              </div>
+            </div>
+            <div className="ref-person">
+              <div className="world-grid"></div>
+              <div className="person-silhouette"><span className="head"></span><span className="body"></span></div>
+              <div className="hud-ring r1"></div><div className="hud-ring r2"></div>
+              <span className="hud h1">♟</span><span className="hud h2">⚙</span><span className="hud h3">↗</span><span className="hud h4">▤</span>
+              <div className="finger-glow"></div>
+              <blockquote>“Secure Systems<br />Stronger Businesses”</blockquote>
+            </div>
+          </section>
+          <section className="ref-auth">
+            <div className="ref-card">
+              <div className="protected">♢ <span>Protected<br />& Secure</span></div>
+              <h2>Welcome Back</h2>
+              <p>Sign in to your CRM account</p>
+              <form onSubmit={handleLogin}>
+                <label>Username / Email</label>
+                <div className="field"><span>♙</span><input value={userId} onChange={(e) => setUserId(e.target.value)} placeholder="Enter your username or email" required /></div>
+                <label>Password</label>
+                <div className="field"><span>♢</span><input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter your password" required /><button type="button" className="eye" onClick={() => setShowPassword(!showPassword)}>{showPassword ? "◉" : "◎"}</button></div>
+                <div className="ref-options"><label><input type="checkbox" /> Remember me</label><button type="button">Forgot password?</button></div>
+                <button className="ref-signin">Sign In <span>→</span></button>
+              </form>
+              {message && <div className="auth-message">{message}</div>}
+              <div className="or"><span></span>OR<span></span></div>
+              <div className="social-row"><button><b className="google">G</b> Continue with Google</button><button><b className="microsoft">⊞</b> Continue with Microsoft</button></div>
+              <div className="new-crm">New to CRM? <span>Contact your administrator</span></div>
+            </div>
+          </section>
+        </main>
+        <footer className="ref-footer"><div><span className="mini-logo">▥</span> CRM Application <small>© 2026. All rights reserved.</small></div><div>Privacy&nbsp;&nbsp; | &nbsp;&nbsp;Terms&nbsp;&nbsp; | &nbsp;&nbsp;Support</div><div><i></i> All Systems Operational</div></footer>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <nav className="navbar">
+        <h2>EnterpriseFlow CRM</h2>
+        <div><span>{user?.companyName || "Enterprise Workspace"} · {user?.name || "User"}</span><button onClick={logout}>Logout</button></div>
+      </nav>
+
+      <div className="dashboard">
+        <aside className="sidebar">
+          {["Dashboard", "Tickets", "Create Ticket", "Users"].map((page) => (
+            <button key={page} className={activePage === page ? "active-nav" : ""} onClick={() => nav(page)}>
+              {page === "Dashboard" ? "▦" : page === "Tickets" ? "▤" : page === "Create Ticket" ? "＋" : "♙"} {page}
+            </button>
+          ))}
+        </aside>
+
+        <main className="main-content">
+          {activePage === "Dashboard" && (
+            <>
+              <div className="page-header">
+                <div>
+                  <div className="dashboard-kicker">CRM SERVICE DESK</div>
+                  <h1>Operations Dashboard</h1>
+                  <p>Live support workload, team capacity and recent ticket activity.</p>
+                </div>
+                <button className="refresh-btn" onClick={loadDashboard} disabled={dashboardLoading}>{dashboardLoading ? "Refreshing..." : "Refresh"}</button>
+              </div>
+
+              {dashboardMessage && <p className="message">{dashboardMessage}</p>}
+
+              <div className="stats dashboard-primary-stats">
+                {[
+                  ["Total Tickets", dashboardData.totalTickets, "All requests", "cyan"],
+                  ["Open Tickets", dashboardData.openTickets, "Need attention", "orange"],
+                  ["In Progress", dashboardData.inProgressTickets, "Being handled", "purple"],
+                  ["Resolved", dashboardData.closedTickets, "Completed", "green"]
+                ].map(([label, value, note, tone]) => (
+                  <div className={`stat-card ${tone}`} key={label}>
+                    <div className="stat-label">{label}</div>
+                    <div className="stat-value">{value}</div>
+                    <div className="stat-note">{note}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="dashboard-secondary-stats">
+                <div className="mini-stat"><span>High Priority</span><strong>{dashboardData.highPriorityTickets}</strong><small>Priority 1 tickets</small></div>
+                <div className="mini-stat"><span>Customers</span><strong>{dashboardData.customers}</strong><small>Registered requesters</small></div>
+                <div className="mini-stat"><span>Engineers</span><strong>{dashboardData.engineers}</strong><small>Support agents</small></div>
+                <div className="mini-stat"><span>Total Users</span><strong>{dashboardData.totalUsers}</strong><small>{dashboardData.admins} administrator{dashboardData.admins === 1 ? "" : "s"}</small></div>
+              </div>
+
+              <div className="crm-dashboard-grid">
+                <section className="dashboard-panel recent-panel">
+                  <div className="panel-heading">
+                    <div><span className="panel-eyebrow">LATEST ACTIVITY</span><h3>Recent Tickets</h3></div>
+                    <button onClick={() => nav("Tickets")}>View all</button>
+                  </div>
+                  {dashboardData.recentTickets.length === 0 ? (
+                    <div className="panel-empty"><strong>No tickets yet</strong><span>Create a support ticket to start the workflow.</span></div>
+                  ) : (
+                    <div className="recent-ticket-list">
+                      {dashboardData.recentTickets.map((ticket) => (
+                        <div className="recent-ticket-row" key={ticket._id}>
+                          <div className="ticket-dot"></div>
+                          <div className="recent-ticket-main"><strong>{ticket.title}</strong><span>{ticket.reporter || "Unknown requester"} · {formatDate(ticket.createdAt)}</span></div>
+                          <span className={`ticket-status-badge ${(ticket.status || "").toLowerCase()}`}>{(ticket.status || "OPEN").replace("_", " ")}</span>
+                          <span className="priority-pill">P{ticket.ticketPriority || "—"}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </section>
+
+                <section className="dashboard-panel priority-panel">
+                  <div className="panel-heading"><div><span className="panel-eyebrow">WORKLOAD</span><h3>Priority Breakdown</h3></div></div>
+                  <div className="priority-bars">
+                    {[1, 2, 3, 4, 5].map((priority) => {
+                      const count = Number(dashboardData.priorityBreakdown?.[priority] || 0);
+                      const width = priorityTotal ? Math.max((count / priorityTotal) * 100, count ? 8 : 0) : 0;
+                      return (
+                        <div className="priority-row" key={priority}>
+                          <div className="priority-meta"><span>Priority {priority}</span><strong>{count}</strong></div>
+                          <div className="priority-track"><span style={{ width: `${width}%` }}></span></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section className="dashboard-panel workflow-panel">
+                  <div className="panel-heading"><div><span className="panel-eyebrow">SERVICE WORKFLOW</span><h3>Ticket Lifecycle</h3></div></div>
+                  <div className="workflow-steps">
+                    <div><span>01</span><strong>Open</strong><small>Request received</small></div>
+                    <i>→</i>
+                    <div><span>02</span><strong>In Progress</strong><small>Engineer working</small></div>
+                    <i>→</i>
+                    <div><span>03</span><strong>Resolved</strong><small>Request completed</small></div>
+                  </div>
+                </section>
+
+                <section className="dashboard-panel team-panel">
+                  <div className="panel-heading"><div><span className="panel-eyebrow">WORKSPACE</span><h3>Support Team</h3></div></div>
+                  <div className="team-metrics">
+                    <div><span>Engineers</span><strong>{dashboardData.engineers}</strong></div>
+                    <div><span>Customers</span><strong>{dashboardData.customers}</strong></div>
+                    <div><span>Admins</span><strong>{dashboardData.admins}</strong></div>
+                  </div>
+                  <div className="scope-chip">View: {dashboardData.scope ? dashboardData.scope.replaceAll("_", " ") : "WORKSPACE"}</div>
+                </section>
+              </div>
+            </>
+          )}
+
+          {activePage === "Tickets" && (
+            <>
+              <div className="page-header"><div><h1>Support Tickets</h1><p>Monitor and manage customer requests.</p></div><button className="refresh-btn" onClick={loadTickets}>Refresh</button></div>
+              {ticketMessage && <p className="message">{ticketMessage}</p>}
+              {ticketsLoading ? <p>Loading tickets...</p> : tickets.length === 0 ? <div className="empty-state"><h3>No tickets yet</h3><p>Create a support request to get started.</p></div> : (
+                <div className="tickets-grid">
+                  {tickets.map((ticket) => (
+                    <div className="ticket-card" key={ticket._id}>
+                      <h3>{ticket.title}</h3><p>{ticket.description}</p><p><b>Priority:</b> {ticket.ticketPriority}</p><p><b>Status:</b> <span className="status">{ticket.status}</span></p><p><b>Reporter:</b> {ticket.reporter}</p>{ticket.assignee && <p><b>Assignee:</b> {ticket.assignee}</p>}
+                      <div className="update-status-section"><select value={selectedStatuses[ticket._id] || ticket.status} onChange={(e) => setSelectedStatuses((previous) => ({ ...previous, [ticket._id]: e.target.value }))}><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option value="CLOSED">CLOSED</option></select><button className="update-status-btn" onClick={() => handleUpdateStatus(ticket)} disabled={updatingTicketId === ticket._id}>{updatingTicketId === ticket._id ? "Updating..." : "Update Status"}</button></div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          {activePage === "Create Ticket" && (
+            <>
+              <h1>Create Support Ticket</h1><p>Submit a new customer or internal support request.</p>
+              <div className="ticket-form-container"><form className="ticket-form" onSubmit={handleCreateTicket}><label>Ticket title</label><input value={title} onChange={(e) => setTitle(e.target.value)} required /><label>Description</label><textarea value={description} onChange={(e) => setDescription(e.target.value)} required /><label>Priority</label><select value={ticketPriority} onChange={(e) => setTicketPriority(e.target.value)}>{[1, 2, 3, 4, 5].map((n) => <option key={n}>{n}</option>)}</select><label>Status</label><select value={ticketStatus} onChange={(e) => setTicketStatus(e.target.value)}><option>OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option>CLOSED</option></select><button className="create-btn">Create Ticket</button></form>{ticketMessage && <p className="message">{ticketMessage}</p>}</div>
+            </>
+          )}
+
+          {activePage === "Users" && (
+            <>
+              <div className="page-header"><div><h1>User Management</h1><p>Manage workspace customers, engineers and administrators.</p></div><button className="refresh-btn" onClick={() => loadUsers()}>Refresh</button></div>
+              <div className="user-filters"><div><label>Role</label><select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)}><option value="">All Roles</option><option>ADMIN</option><option>CUSTOMER</option><option>ENGINEER</option></select></div><div><label>Status</label><select value={userStatusFilter} onChange={(e) => setUserStatusFilter(e.target.value)}><option value="">All Status</option><option>APPROVED</option><option>PENDING</option><option>BLOCKED</option></select></div><div className="filter-buttons"><button className="filter-btn" onClick={() => loadUsers()}>Apply</button><button className="clear-btn" onClick={() => { setUserTypeFilter(""); setUserStatusFilter(""); loadUsers("", ""); }}>Clear</button></div></div>
+              {userMessage && <p className="message">{userMessage}</p>}
+              {usersLoading ? <p>Loading users...</p> : <div className="users-table-container"><table className="users-table"><thead><tr><th>Name</th><th>User ID</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>{users.map((current) => <tr key={current._id || current.userId}><td>{current.name}</td><td>{current.userId}</td><td>{current.email}</td><td>{current.userType}</td><td><span className="status">{current.userStatus}</span></td></tr>)}</tbody></table></div>}
+            </>
+          )}
+        </main>
+      </div>
+    </div>
+  );
+}
+
 export default App;
