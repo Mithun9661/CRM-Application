@@ -12,16 +12,22 @@ exports.getDashboardStats = async (req, res) => {
     const ticketScope = {};
     const userScope = {};
 
-    // Super Admin can see platform-wide metrics. Company Admin sees only their tenant.
     if (currentUser.userType !== constants.userType.superAdmin) {
       if (!currentUser.companyId) {
         return res.status(400).send({
           success: false,
-          message: "Admin is not assigned to a company"
+          message: "User is not assigned to a company"
         });
       }
+
       ticketScope.companyId = currentUser.companyId;
       userScope.companyId = currentUser.companyId;
+
+      if (currentUser.userType === constants.userType.engineer) {
+        ticketScope.assignee = currentUser.userId;
+      } else if (currentUser.userType === constants.userType.customer) {
+        ticketScope.reporter = currentUser.userId;
+      }
     }
 
     const [
@@ -64,7 +70,14 @@ exports.getDashboardStats = async (req, res) => {
 
     return res.status(200).send({
       success: true,
-      scope: currentUser.userType === constants.userType.superAdmin ? "PLATFORM" : "COMPANY",
+      scope:
+        currentUser.userType === constants.userType.superAdmin
+          ? "PLATFORM"
+          : currentUser.userType === constants.userType.admin
+            ? "COMPANY"
+            : currentUser.userType === constants.userType.engineer
+              ? "ASSIGNED_TICKETS"
+              : "MY_TICKETS",
       stats: {
         totalTickets,
         openTickets,
