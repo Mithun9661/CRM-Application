@@ -1,5 +1,6 @@
 import "./App.css";
 import { useEffect, useState } from "react";
+import TicketDetails from "./TicketDetails";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7777/crm/api/v1";
 
@@ -36,6 +37,7 @@ function App() {
   const [ticketMessage, setTicketMessage] = useState("");
   const [selectedStatuses, setSelectedStatuses] = useState({});
   const [updatingTicketId, setUpdatingTicketId] = useState("");
+  const [selectedTicket, setSelectedTicket] = useState(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [ticketPriority, setTicketPriority] = useState("3");
@@ -252,6 +254,7 @@ function App() {
   };
 
   const nav = (page) => {
+    setSelectedTicket(null);
     setActivePage(page);
     setTicketMessage("");
     setUserMessage("");
@@ -267,6 +270,7 @@ function App() {
   const logout = () => {
     localStorage.removeItem("crmToken");
     localStorage.removeItem("crmUser");
+    setSelectedTicket(null);
     setIsLoggedIn(false);
     setUser(null);
   };
@@ -402,7 +406,7 @@ function App() {
                   ) : (
                     <div className="recent-ticket-list">
                       {dashboardData.recentTickets.map((ticket) => (
-                        <div className="recent-ticket-row" key={ticket._id}>
+                        <div className="recent-ticket-row" key={ticket._id} onClick={() => setSelectedTicket(ticket)}>
                           <div className="ticket-dot"></div>
                           <div className="recent-ticket-main"><strong>{ticket.title}</strong><span>{ticket.reporter || "Unknown requester"} · {formatDate(ticket.createdAt)}</span></div>
                           <span className={`ticket-status-badge ${(ticket.status || "").toLowerCase()}`}>{(ticket.status || "OPEN").replace("_", " ")}</span>
@@ -463,6 +467,7 @@ function App() {
                     <div className="ticket-card" key={ticket._id}>
                       <h3>{ticket.title}</h3><p>{ticket.description}</p><p><b>Priority:</b> {ticket.ticketPriority}</p><p><b>Status:</b> <span className="status">{ticket.status}</span></p><p><b>Reporter:</b> {ticket.reporter}</p>{ticket.assignee && <p><b>Assignee:</b> {ticket.assignee}</p>}
                       <div className="update-status-section"><select value={selectedStatuses[ticket._id] || ticket.status} onChange={(e) => setSelectedStatuses((previous) => ({ ...previous, [ticket._id]: e.target.value }))}><option value="OPEN">OPEN</option><option value="IN_PROGRESS">IN PROGRESS</option><option value="CLOSED">CLOSED</option></select><button className="update-status-btn" onClick={() => handleUpdateStatus(ticket)} disabled={updatingTicketId === ticket._id}>{updatingTicketId === ticket._id ? "Updating..." : "Update Status"}</button></div>
+                      <button className="view-details-btn" onClick={() => setSelectedTicket(ticket)}>View Details & Activity</button>
                     </div>
                   ))}
                 </div>
@@ -487,6 +492,17 @@ function App() {
           )}
         </main>
       </div>
+
+      {selectedTicket && (
+        <TicketDetails
+          ticket={selectedTicket}
+          onClose={() => setSelectedTicket(null)}
+          onChanged={() => {
+            loadDashboard();
+            loadTickets();
+          }}
+        />
+      )}
     </div>
   );
 }
