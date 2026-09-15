@@ -1,6 +1,8 @@
 import "./App.css";
 import { useEffect, useState } from "react";
 import TicketDetails from "./TicketDetails";
+import UserManagement from "./UserManagement";
+import CompanyManagement from "./CompanyManagement";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:7777/crm/api/v1";
 
@@ -42,12 +44,6 @@ function App() {
   const [description, setDescription] = useState("");
   const [ticketPriority, setTicketPriority] = useState("3");
   const [ticketStatus, setTicketStatus] = useState("OPEN");
-
-  const [users, setUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(false);
-  const [userMessage, setUserMessage] = useState("");
-  const [userTypeFilter, setUserTypeFilter] = useState("");
-  const [userStatusFilter, setUserStatusFilter] = useState("");
 
   useEffect(() => {
     const savedUser = localStorage.getItem("crmUser");
@@ -195,32 +191,6 @@ function App() {
     }
   };
 
-  const loadUsers = async (type = userTypeFilter, status = userStatusFilter) => {
-    const token = localStorage.getItem("crmToken");
-    setUsersLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (type) params.append("userType", type);
-      if (status) params.append("userStatus", status);
-
-      const response = await fetch(`${API_URL}/users${params.toString() ? `?${params}` : ""}`, {
-        headers: { "x-access-token": token }
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        setUsers([]);
-        return setUserMessage(data.message || "Failed to load users");
-      }
-      const list = Array.isArray(data) ? data : data.users || data.data || [];
-      setUsers(list);
-      setUserMessage(list.length ? "" : "No users found");
-    } catch {
-      setUserMessage("Cannot connect to backend");
-    } finally {
-      setUsersLoading(false);
-    }
-  };
-
   const handleCreateTicket = async (e) => {
     e.preventDefault();
     const token = localStorage.getItem("crmToken");
@@ -257,10 +227,8 @@ function App() {
     setSelectedTicket(null);
     setActivePage(page);
     setTicketMessage("");
-    setUserMessage("");
     if (page === "Dashboard") loadDashboard();
     if (page === "Tickets") loadTickets();
-    if (page === "Users") loadUsers();
   };
 
   useEffect(() => {
@@ -285,6 +253,16 @@ function App() {
     (sum, value) => sum + Number(value || 0),
     0
   );
+
+  const canManageUsers = ["ADMIN", "SUPER_ADMIN"].includes(user?.userType);
+  const isSuperAdmin = user?.userType === "SUPER_ADMIN";
+  const navigationPages = [
+    "Dashboard",
+    "Tickets",
+    "Create Ticket",
+    ...(canManageUsers ? ["Users"] : []),
+    ...(isSuperAdmin ? ["Companies"] : [])
+  ];
 
   if (!isLoggedIn) {
     return (
@@ -347,14 +325,14 @@ function App() {
     <div>
       <nav className="navbar">
         <h2>EnterpriseFlow CRM</h2>
-        <div><span>{user?.companyName || "Enterprise Workspace"} · {user?.name || "User"}</span><button onClick={logout}>Logout</button></div>
+        <div><span>{user?.companyName || "Enterprise Workspace"} · {user?.name || "User"} · {user?.userType?.replace("_", " ")}</span><button onClick={logout}>Logout</button></div>
       </nav>
 
       <div className="dashboard">
         <aside className="sidebar">
-          {["Dashboard", "Tickets", "Create Ticket", "Users"].map((page) => (
+          {navigationPages.map((page) => (
             <button key={page} className={activePage === page ? "active-nav" : ""} onClick={() => nav(page)}>
-              {page === "Dashboard" ? "▦" : page === "Tickets" ? "▤" : page === "Create Ticket" ? "＋" : "♙"} {page}
+              {page === "Dashboard" ? "▦" : page === "Tickets" ? "▤" : page === "Create Ticket" ? "＋" : page === "Users" ? "♙" : "▧"} {page}
             </button>
           ))}
         </aside>
@@ -482,14 +460,8 @@ function App() {
             </>
           )}
 
-          {activePage === "Users" && (
-            <>
-              <div className="page-header"><div><h1>User Management</h1><p>Manage workspace customers, engineers and administrators.</p></div><button className="refresh-btn" onClick={() => loadUsers()}>Refresh</button></div>
-              <div className="user-filters"><div><label>Role</label><select value={userTypeFilter} onChange={(e) => setUserTypeFilter(e.target.value)}><option value="">All Roles</option><option>ADMIN</option><option>CUSTOMER</option><option>ENGINEER</option></select></div><div><label>Status</label><select value={userStatusFilter} onChange={(e) => setUserStatusFilter(e.target.value)}><option value="">All Status</option><option>APPROVED</option><option>PENDING</option><option>BLOCKED</option></select></div><div className="filter-buttons"><button className="filter-btn" onClick={() => loadUsers()}>Apply</button><button className="clear-btn" onClick={() => { setUserTypeFilter(""); setUserStatusFilter(""); loadUsers("", ""); }}>Clear</button></div></div>
-              {userMessage && <p className="message">{userMessage}</p>}
-              {usersLoading ? <p>Loading users...</p> : <div className="users-table-container"><table className="users-table"><thead><tr><th>Name</th><th>User ID</th><th>Email</th><th>Role</th><th>Status</th></tr></thead><tbody>{users.map((current) => <tr key={current._id || current.userId}><td>{current.name}</td><td>{current.userId}</td><td>{current.email}</td><td>{current.userType}</td><td><span className="status">{current.userStatus}</span></td></tr>)}</tbody></table></div>}
-            </>
-          )}
+          {activePage === "Users" && canManageUsers && <UserManagement currentUser={user} />}
+          {activePage === "Companies" && isSuperAdmin && <CompanyManagement />}
         </main>
       </div>
 
