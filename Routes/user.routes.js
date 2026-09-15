@@ -4,10 +4,14 @@ const userController = require("../Controllers/user.controller");
 const authMW = require("../middlewares/authjwt");
 const verifyUserReqBody = require("../middlewares/verifyUserReqBody");
 
-router.get("/users",[authMW.verifyToken , authMW.isAdmin],userController.findAll);
+const adminAccess = [authMW.verifyToken, authMW.isAdminOrSuperAdmin];
 
-router.get("/users/:userId",[authMW.verifyToken, authMW.isAdmin],userController.findById);
+router.get("/users", adminAccess, userController.findAll);
+router.get("/users/:userId", adminAccess, userController.findById);
+router.put(
+  "/users/:userId",
+  [authMW.verifyToken, authMW.isAdminOrSuperAdmin, verifyUserReqBody.validateUserStatusAndUserType],
+  userController.updateUser
+);
 
-
-router.put("/users/:userId",[authMW.verifyToken, authMW.isAdmin,verifyUserReqBody.validateUserStatusAndUserType],userController.updateUser);
 module.exports = router;
