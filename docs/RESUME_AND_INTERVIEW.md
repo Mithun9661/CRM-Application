@@ -6,20 +6,37 @@
 
 ## Resume description
 
-Built and deployed a multi-tenant CRM/service-desk platform using React, Node.js, Express, MongoDB Atlas, JWT, and role-based access control. Implemented tenant-isolated ticket workflows, engineer assignment, comments, audit history, notifications, analytics, advanced search/filtering, pagination, and company/user administration. Deployed frontend on Vercel and backend on Render with CI checks using GitHub Actions.
+Built and deployed a multi-tenant CRM/service-desk platform using React, Node.js, Express, MongoDB Atlas, JWT, and role-based access control. Implemented tenant-isolated ticket workflows, engineer assignment, comments, audit history, persistent in-app notifications, transactional email notifications through Resend HTTPS API, analytics, advanced search/filtering, pagination, and company/user administration. Deployed frontend on Vercel and backend on Render with CI checks using GitHub Actions.
 
 ## Strong resume bullets
 
-- Developed a full-stack multi-company CRM using React, Node.js, Express, MongoDB Atlas, and JWT authentication.
-- Designed tenant isolation using `companyId` across users, tickets, comments, analytics, and assignment workflows.
-- Implemented RBAC for Super Admin, Admin, Engineer, and Customer roles with backend authorization checks.
-- Built ticket search, filters, sorting, pagination, comments, audit history, notification inbox, and engineer assignment workflows.
-- Added production safeguards including CORS restrictions, security headers, rate limiting, safe error responses, and health checks.
-- Deployed the frontend to Vercel and backend to Render and added GitHub Actions CI for backend tests and frontend builds.
+- Developed a full-stack multi-company CRM using React, Node.js, Express, MongoDB Atlas, JWT authentication, and RBAC.
+- Designed tenant isolation using `companyId` across users, tickets, comments, analytics, assignment, and notification workflows.
+- Implemented four roles — Super Admin, Admin, Engineer, and Customer — with backend authorization checks for platform, company, assignee, and reporter scope.
+- Built ticket search, filters, sorting, pagination, comments, audit history, persistent notification inbox, engineer assignment, and status-management workflows.
+- Added transactional email notifications with Resend HTTPS API so production email delivery works on Render without depending on blocked SMTP ports.
+- Added production safeguards including CORS restrictions, security headers, rate limiting, safe error responses, session-expiry handling, and health checks.
+- Deployed the frontend to Vercel and backend to Render, used MongoDB Atlas for production data, and added GitHub Actions CI for backend tests and frontend builds.
+
+## Verified V1 flows
+
+The production deployment has been manually verified for:
+
+- Super Admin access to multiple companies and platform-wide tickets
+- Company-scoped Admin access
+- Customer isolation to only the customer's own tickets
+- Engineer isolation to assigned tickets only
+- Customer ticket creation with server-side reporter/company assignment
+- Automatic same-company engineer assignment
+- Ticket status changes and audit history
+- Ticket comments and activity history
+- Persistent in-app notifications
+- Transactional email notifications through Resend
+- Multi-company ticket isolation across EnterpriseFlow Demo and Nova Retail Labs
 
 ## 30-second interview explanation
 
-> EnterpriseFlow CRM is a multi-company support platform. A Super Admin manages companies, each company has its own Admins, Engineers, and Customers, and all support tickets are isolated by tenant. Customers create tickets, Admins assign engineers, Engineers update them, and everyone with permission can collaborate through comments and activity history. I deployed the React frontend on Vercel, the Express API on Render, and MongoDB Atlas stores the data. The main focus was secure multi-tenant authorization rather than only CRUD functionality.
+> EnterpriseFlow CRM is a multi-company support platform. A Super Admin manages companies, each company has its own Admins, Engineers, and Customers, and all support tickets are isolated by tenant. Customers create tickets, Engineers work on assigned tickets, Admins manage company operations, and important status/comment events generate both in-app and email notifications. I deployed the React frontend on Vercel, the Express API on Render, and MongoDB Atlas stores the data. The main focus was secure multi-tenant authorization rather than only CRUD functionality.
 
 ## Key technical questions
 
@@ -36,7 +53,10 @@ Super Admin has platform-level access. Admin has company-level access. Engineer 
 Dashboard counts and recent activity are calculated from MongoDB using a query scope built from the current user's role and company.
 
 ### How do notifications work?
-Important events create persistent notification documents in MongoDB. The frontend notification center fetches them and shows unread counts. Redis is optional for asynchronous email/background delivery, so core in-app notifications do not depend on Redis.
+Important events create persistent notification documents in MongoDB and the frontend shows unread counts. Email notifications are delivered through the Resend HTTPS API. The main ticket workflow does not depend on Redis or email delivery succeeding.
+
+### Why use Resend instead of Gmail SMTP in production?
+The deployed backend runs on Render, where outbound SMTP ports can be restricted on free services. Resend uses HTTPS, so transactional email delivery works without requiring direct SMTP connectivity.
 
 ### How would you scale ticket search?
 Use compound indexes based on actual query patterns, especially company + status + createdAt and company + assignee + status. For larger free-text search requirements, use Atlas Search or a dedicated search service instead of regex queries.
