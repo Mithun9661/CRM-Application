@@ -1,6 +1,6 @@
 # EnterpriseFlow CRM
 
-EnterpriseFlow is a production-deployed, multi-company CRM and service-desk application built with the MERN stack. It supports tenant isolation, JWT authentication, role-based access control, ticket workflows, engineer assignment, comments, audit history, persistent in-app notifications, dashboard analytics, advanced ticket search, and company administration.
+EnterpriseFlow is a production-deployed, multi-company CRM and service-desk application built with the MERN stack. It supports tenant isolation, JWT authentication, role-based access control, ticket workflows, engineer assignment, comments, audit history, persistent in-app notifications, transactional email notifications, dashboard analytics, advanced ticket search, and company administration.
 
 ## Live Application
 
@@ -10,6 +10,27 @@ EnterpriseFlow is a production-deployed, multi-company CRM and service-desk appl
 - Swagger: https://crm-application-ahkr.onrender.com/api-docs
 
 > The backend is hosted on a free Render service, so the first request after an idle period can take a little longer.
+
+## Verified V1 Demo Evidence
+
+The deployed V1 has been manually verified for:
+
+- Super Admin multi-company visibility
+- Company and user administration
+- Customer ticket isolation
+- Engineer assigned-ticket isolation
+- Customer ticket creation with server-derived tenant/reporter scope
+- Same-company engineer assignment
+- Ticket status updates
+- Comments and audit history
+- Persistent MongoDB-backed in-app notifications
+- Transactional email delivery through the Resend HTTPS API
+
+Recommended screenshot/demo sequence:
+
+`Login -> Companies -> Users -> Global Tickets -> Customer Isolation -> Engineer Dashboard -> Ticket Activity -> Create Ticket -> Notifications/Email`
+
+See [`docs/SCREENSHOT_DEMO_GUIDE.md`](docs/SCREENSHOT_DEMO_GUIDE.md) for the final screenshot captions and demo order.
 
 ## Core Features
 
@@ -49,7 +70,9 @@ EnterpriseFlow is a production-deployed, multi-company CRM and service-desk appl
 - Unread notification counter
 - Notifications for ticket assignment, ticket updates and new comments
 - Mark one or all notifications as read
-- Optional Redis notification queue when `REDIS_URL` is configured
+- Transactional email delivery through the Resend HTTPS API
+- Email delivery failures do not break ticket/comment workflows
+- Optional Redis integration can remain available for background/event workflows
 
 ### Security
 
@@ -87,6 +110,7 @@ EnterpriseFlow is a production-deployed, multi-company CRM and service-desk appl
 - Render
 - Vercel
 - Docker
+- Resend HTTPS API
 - Optional Redis
 
 ## Project Structure
@@ -99,6 +123,7 @@ CRM-Application/
 ├── configs/
 ├── middlewares/
 ├── utils/
+├── docs/
 ├── frontend/
 │   └── src/
 ├── index.js
@@ -126,6 +151,8 @@ JWT_SECRET=use_a_long_random_secret
 CORS_ORIGINS=http://localhost:5173
 BASE_URL=http://localhost:7777
 REDIS_URL=optional_redis_url
+RESEND_API_KEY=optional_resend_api_key
+RESEND_FROM=optional_verified_sender
 DEFAULT_ADMIN_PASSWORD=optional_bootstrap_password_for_new_database
 DEFAULT_SUPERADMIN_PASSWORD=optional_bootstrap_password_for_new_database
 ```
@@ -179,15 +206,15 @@ npm run dev
 ## Interview Demo Flow
 
 1. Open the deployed frontend and sign in.
-2. Show the live operations dashboard.
-3. Create a support ticket.
-4. Open **Tickets** and demonstrate search, filters and pagination.
-5. Open **Details & Activity** to show comments and the audit trail.
-6. As an Admin, assign the ticket to an engineer and update its status.
-7. Show the notification bell and unread activity.
-8. Show **Users** for role/status management.
-9. With Super Admin access, show **Companies** and multi-tenant administration.
-10. Open Swagger to explain the REST API design.
+2. Show **Companies** and **Users** as Super Admin.
+3. Show global cross-tenant ticket visibility as Super Admin.
+4. Login as a Customer and show own-ticket isolation.
+5. Create a customer support ticket.
+6. Login as the assigned Engineer and update the ticket status.
+7. Add a comment and show **Details & Activity** / audit history.
+8. Show the notification bell and unread customer activity.
+9. Show the role-aware Operations Dashboard and ticket search/filter workspace.
+10. Mention the verified Resend email notification flow and open Swagger to explain the REST API design.
 
 ## Deployment Architecture
 
@@ -198,11 +225,20 @@ React / Vite (Vercel)
         v
 Node.js / Express (Render)
         |
+        +---- Resend HTTPS API (transactional email)
+        |
         v
 MongoDB Atlas
         |
-        +---- Optional Redis notification queue
+        +---- Optional Redis integration
 ```
+
+## Documentation
+
+- [`docs/INTERVIEW_DEMO.md`](docs/INTERVIEW_DEMO.md) - 4-6 minute interview walkthrough
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) - architecture notes
+- [`docs/RESUME_AND_INTERVIEW.md`](docs/RESUME_AND_INTERVIEW.md) - resume bullets and interview answers
+- [`docs/SCREENSHOT_DEMO_GUIDE.md`](docs/SCREENSHOT_DEMO_GUIDE.md) - screenshot order and captions
 
 ## Author
 
