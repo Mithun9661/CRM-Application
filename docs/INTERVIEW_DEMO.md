@@ -19,9 +19,52 @@ The application supports four roles:
 
 Explain that authorization is enforced on the backend, not only by hiding frontend buttons.
 
-## 3. Admin dashboard
+## 3. Super Admin multi-company demo
 
-Show the Operations Dashboard and explain that all statistics come from MongoDB:
+Login as Super Admin and show:
+
+- **Companies** — EnterpriseFlow Demo and Nova Retail Labs
+- **Users** — users from both tenants
+- **Tickets** — platform-wide visibility across both companies
+
+Explain that Super Admin is the only role with platform-wide access.
+
+## 4. Customer isolation demo
+
+Login as a Customer and show that:
+
+- Only tickets created by that customer are visible
+- Admin-created or Nova Retail Labs tickets are not visible
+- Customer ticket creation does not expose company/reporter assignment fields
+- The backend derives reporter and company from the authenticated user
+
+Create a ticket and show automatic assignment to an approved engineer from the same company.
+
+## 5. Engineer workflow
+
+Login as the assigned Engineer and demonstrate:
+
+- Only tickets assigned to that engineer are visible
+- Update a ticket from `OPEN` to `IN_PROGRESS`
+- Add a support comment
+- Show the ticket history/audit timeline
+
+Explain that each sensitive action is checked again on the backend against role, company, reporter, and assignee rules.
+
+## 6. Notification and email flow
+
+Demonstrate:
+
+- Persistent in-app notifications stored in MongoDB
+- Notification bell/unread count in the frontend
+- Customer notification after engineer status update or comment
+- Transactional email notification through the Resend HTTPS API
+
+Mention that the CRM's core workflow continues even if external email delivery fails.
+
+## 7. Admin dashboard and ticket workspace
+
+Show the Operations Dashboard and explain that statistics are calculated from MongoDB within the current user's access scope:
 
 - Total tickets
 - Open tickets
@@ -31,10 +74,6 @@ Show the Operations Dashboard and explain that all statistics come from MongoDB:
 - Customer/Engineer/Admin counts
 - Recent tickets
 - Priority breakdown
-
-Mention that non-Super-Admin users only see their company scope.
-
-## 4. Ticket workspace
 
 Open **Tickets** and demonstrate:
 
@@ -46,36 +85,7 @@ Open **Tickets** and demonstrate:
 - Newest/oldest/priority sorting
 - Server-side pagination
 
-Open one ticket using **View Details & Activity**.
-
-## 5. Ticket details and collaboration
-
-Inside a ticket demonstrate:
-
-- Status and priority
-- Reporter and assigned engineer
-- Same-company engineer assignment
-- Comments
-- Ticket history / audit timeline
-- Persistent notifications when assignments, status updates, or comments happen
-
-Explain that tenant and role checks are repeated on the backend for every sensitive operation.
-
-## 6. User and company management
-
-As an Admin show **Users**:
-
-- Approve/block users
-- Customer/Engineer role management
-- Company-scoped administration
-
-As a Super Admin show **Companies**:
-
-- Create/manage companies
-- Company lifecycle status
-- Assign users to companies
-
-## 7. Production and engineering points
+## 8. Production and engineering points
 
 Mention:
 
@@ -85,13 +95,29 @@ Mention:
 - JWT authentication + bcrypt password hashing
 - Multi-tenant data isolation using `companyId`
 - Persistent notification collection
-- Redis integration is optional for background email processing
+- Resend HTTPS API for production transactional email
+- Redis integration remains optional and does not block core workflows
 - Swagger/OpenAPI documentation
 - Health endpoint
-- Rate limiting and security headers
+- Rate limiting, CORS restrictions, and security headers
+- Session-expiry recovery in the frontend
 - GitHub Actions CI for backend tests and frontend production builds
 
-## 8. Closing line
+## 9. V1 verification status
+
+The deployed V1 has been manually verified for:
+
+- Multi-company Super Admin visibility
+- Customer isolation
+- Engineer assigned-ticket isolation
+- Customer ticket creation
+- Same-company engineer assignment
+- Status updates
+- Comments and audit history
+- In-app notifications
+- Email notification delivery
+
+## 10. Closing line
 
 > The main engineering challenge was not CRUD; it was designing role-aware and tenant-aware access so one deployed CRM can safely serve multiple companies while keeping tickets, users, analytics, comments, and notifications isolated.
 
@@ -101,9 +127,10 @@ Mention:
 2. Why is `companyId` stored on tickets and users?
 3. How do you prevent an engineer from viewing another engineer's ticket?
 4. Why use JWT instead of sessions here?
-5. How do notifications work if Redis is unavailable?
-6. How is pagination implemented on the backend?
-7. What happens when a ticket is reassigned?
-8. How would you scale this to thousands of companies?
-9. What indexes would you add for a large ticket collection?
-10. How would you add SLA tracking and escalation?
+5. How do notifications work if the external email provider is unavailable?
+6. Why did you use an HTTPS email provider instead of SMTP on Render?
+7. How is pagination implemented on the backend?
+8. What happens when a ticket is reassigned?
+9. How would you scale this to thousands of companies?
+10. What indexes would you add for a large ticket collection?
+11. How would you add SLA tracking and escalation?
