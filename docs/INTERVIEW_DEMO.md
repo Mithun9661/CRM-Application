@@ -95,7 +95,7 @@ Mention:
 - JWT authentication + bcrypt password hashing
 - Multi-tenant data isolation using `companyId`
 - Persistent notification collection
-- Resend HTTPS API for production transactional email
+- Resend HTTPS API for transactional email
 - Redis integration remains optional and does not block core workflows
 - Swagger/OpenAPI documentation
 - Health endpoint
@@ -103,7 +103,23 @@ Mention:
 - Session-expiry recovery in the frontend
 - GitHub Actions CI for backend tests and frontend production builds
 
-## 9. V1 verification status
+## 9. Final screenshot sequence
+
+Use this exact order when screenshots are shown instead of a live demo:
+
+1. **Secure Login** — secure JWT-based authentication.
+2. **Super Admin - Company Management** — multiple tenant organizations.
+3. **Super Admin - User & Role Management** — RBAC across all four roles.
+4. **Super Admin - Global Ticket Workspace** — authorized cross-tenant visibility.
+5. **Customer Isolation** — customer sees only its own tickets.
+6. **Engineer Operations Dashboard** — assigned support workload and notifications.
+7. **Ticket Details, Status & Audit Trail** — status updates, comments, and history.
+8. **Support Ticket Creation** — role-aware ticket creation.
+9. **Notification / Email evidence** — explain that in-app and Resend email delivery were verified during V1 testing.
+
+Detailed captions are available in [`SCREENSHOT_DEMO_GUIDE.md`](SCREENSHOT_DEMO_GUIDE.md).
+
+## 10. V1 verification status
 
 The deployed V1 has been manually verified for:
 
@@ -117,7 +133,7 @@ The deployed V1 has been manually verified for:
 - In-app notifications
 - Email notification delivery
 
-## 10. Closing line
+## 11. Closing line
 
 > The main engineering challenge was not CRUD; it was designing role-aware and tenant-aware access so one deployed CRM can safely serve multiple companies while keeping tickets, users, analytics, comments, and notifications isolated.
 
