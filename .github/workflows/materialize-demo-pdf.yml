@@ -25,7 +25,7 @@ jobs:
           mkdir -p docs
           cat .github/pdf-payload/part-* > /tmp/enterprise-flow-demo.b64
           base64 --decode /tmp/enterprise-flow-demo.b64 > docs/EnterpriseFlow_CRM_V1_Demo_Evidence.pdf
-          echo "062a76289d10ad55db5d59388141ad8507442b5acd65de5b70cdc93077fb8c64  docs/EnterpriseFlow_CRM_V1_Demo_Evidence.pdf" | sha256sum -c -
+          echo "e2f716a1fee216db91c715a4bef43f099cd0686618d1456e5b9a680a01ad993c  docs/EnterpriseFlow_CRM_V1_Demo_Evidence.pdf" | sha256sum -c -
           rm -rf .github/pdf-payload
 
       - name: Commit generated PDF
